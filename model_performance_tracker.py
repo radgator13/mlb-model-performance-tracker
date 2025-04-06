@@ -23,26 +23,29 @@ def load_picks_log():
 def fetch_final_score(matchup_date: str, team_name: str):
     url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={matchup_date}"
     res = requests.get(url).json()
-
     for game in res.get("dates", [])[0].get("games", []):
         if team_name in (game["teams"]["home"]["team"]["name"], game["teams"]["away"]["team"]["name"]):
             # ✅ Only proceed if scores are available
             if "score" not in game["teams"]["home"] or "score" not in game["teams"]["away"]:
                 return None
-
             return {
                 "home": game["teams"]["home"]["score"],
                 "away": game["teams"]["away"]["score"],
                 "home_team": game["teams"]["home"]["team"]["name"],
                 "away_team": game["teams"]["away"]["team"]["name"]
             }
-
     return None
 
-
-# --- Evaluate Row ---
+# --- Evaluate Row (add pending fallback) ---
 def evaluate_row(row):
     score = fetch_final_score(row["Date"].strftime("%Y-%m-%d"), row["Matchup"].split(" @ ")[1])
+    
+    # Default pending values
+    row["Actual Margin"] = "-"
+    row["Spread Result"] = "PENDING"
+    row["Actual Total"] = "-"
+    row["Total Result"] = "PENDING"
+
     if score is None:
         return row
 
@@ -50,27 +53,23 @@ def evaluate_row(row):
     actual_total = score["home"] + score["away"]
 
     # Evaluate Spread
-    spread_result = "PUSH"
     if "Home" in row["Model Pick (Spread)"]:
         spread_line = float(row["Model Pick (Spread)"].split("-")[-1])
-        spread_result = "WIN" if actual_margin > spread_line else "LOSS"
+        row["Spread Result"] = "WIN" if actual_margin > spread_line else "LOSS"
     elif "Away" in row["Model Pick (Spread)"]:
         spread_line = float(row["Model Pick (Spread)"].split("+")[-1])
-        spread_result = "WIN" if actual_margin < -spread_line else "LOSS"
+        row["Spread Result"] = "WIN" if actual_margin < -spread_line else "LOSS"
 
     # Evaluate Total
-    total_result = "PUSH"
     if "Over" in row["Model Pick (Total)"]:
         line = float(row["Model Pick (Total)"].split()[1])
-        total_result = "WIN" if actual_total > line else "LOSS"
+        row["Total Result"] = "WIN" if actual_total > line else "LOSS"
     elif "Under" in row["Model Pick (Total)"]:
         line = float(row["Model Pick (Total)"].split()[1])
-        total_result = "WIN" if actual_total < line else "LOSS"
+        row["Total Result"] = "WIN" if actual_total < line else "LOSS"
 
     row["Actual Margin"] = actual_margin
-    row["Spread Result"] = spread_result
     row["Actual Total"] = actual_total
-    row["Total Result"] = total_result
     return row
 
 # --- Auto-generate Model Picks (placeholder logic) ---
@@ -132,22 +131,26 @@ if not log_df.empty:
     filtered_df = log_df[log_df["Date"].dt.date == selected_day]
     evaluated = filtered_df.apply(evaluate_row, axis=1)
 
-    # --- Record Summary ---
     st.subheader(f"✅ Results for {selected_day.strftime('%B %d, %Y')}")
-    spread_wins = (evaluated["Spread Result"] == "WIN").sum()
-    spread_losses = (evaluated["Spread Result"] == "LOSS").sum()
-    total_wins = (evaluated["Total Result"] == "WIN").sum()
-    total_losses = (evaluated["Total Result"] == "LOSS").sum()
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Spread Record", f"{spread_wins}–{spread_losses}")
-    with col2:
-        st.metric("Total Record", f"{total_wins}–{total_losses}")
+    # --- Summary ---
+    if "Spread Result" in evaluated.columns:
+        spread_wins = (evaluated["Spread Result"] == "WIN").sum()
+        spread_losses = (evaluated["Spread Result"] == "LOSS").sum()
+        total_wins = (evaluated["Total Result"] == "WIN").sum()
+        total_losses = (evaluated["Total Result"] == "LOSS").sum()
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Spread Record", f"{spread_wins}–{spread_losses}")
+        with col2:
+            st.metric("Total Record", f"{total_wins}–{total_losses}")
+    else:
+        st.info("📋 No results yet — games likely haven't been played.")
 
     st.dataframe(evaluated.reset_index(drop=True), use_container_width=True)
 
-    # --- Save back to log ---
+    # --- Save to picks_log.csv ---
     final_log = pd.concat([log_df[log_df["Date"].dt.date != selected_day], evaluated])
     final_log.to_csv(PICKS_FILE, index=False)
 else:
