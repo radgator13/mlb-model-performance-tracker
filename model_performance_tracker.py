@@ -1,198 +1,160 @@
 ﻿import streamlit as st
 import pandas as pd
-import requests
+from datetime import date, datetime, timedelta
+import plotly.express as px
 import os
-from datetime import date, timedelta
-import altair as alt
-
-st.set_page_config(layout="wide")
-st.title("📊 MLB Model Performance Tracker — with Chart Toggle ✅")  # ← Added to force Git update
 
 PICKS_FILE = "picks_log.csv"
 SEASON_START = date(2025, 3, 27)
 
-def initialize_log_file():
-    if not os.path.exists(PICKS_FILE):
-        columns = [
-            "Date", "Away Team", "Home Team",
-            "Model Pick (Spread)", "Model Pick (Total)",
-            "Actual Margin", "Spread Result", "Actual Total", "Total Result"
-        ]
-        pd.DataFrame(columns=columns).to_csv(PICKS_FILE, index=False)
+st.set_page_config(layout="wide")
 
+st.title("📊 MLB Model Performance Tracker")
+
+# Load and evaluate picks_log.csv
 @st.cache_data
 def load_picks_log():
-    initialize_log_file()
-    return pd.read_csv(PICKS_FILE, parse_dates=["Date"])
+    if os.path.exists(PICKS_FILE):
+        df = pd.read_csv(PICKS_FILE)
+        return df
+    else:
+        return pd.DataFrame()
 
-def fetch_final_score(game_date: str, home_team: str, away_team: str):
-    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={game_date}"
+def parse_float(val):
     try:
-        res = requests.get(url).json()
-        for game in res.get("dates", [])[0].get("games", []):
-            ht = game["teams"]["home"]["team"]["name"]
-            at = game["teams"]["away"]["team"]["name"]
-            if ht == home_team and at == away_team:
-                if "score" not in game["teams"]["home"] or "score" not in game["teams"]["away"]:
-                    return None
-                return {
-                    "home_score": game["teams"]["home"]["score"],
-                    "away_score": game["teams"]["away"]["score"]
-                }
-    except Exception as e:
-        st.warning(f"Score fetch error for {home_team} vs {away_team}: {e}")
-    return None
+        return float(str(val).strip())
+    except:
+        return None
 
-def evaluate_row(row):
-    score = fetch_final_score(row["Date"].strftime("%Y-%m-%d"), row["Home Team"], row["Away Team"])
-    row["Actual Margin"] = "-"
-    row["Actual Total"] = "-"
-    row["Spread Result"] = "PENDING"
-    row["Total Result"] = "PENDING"
-    if not score:
-        return row
+def reevaluate(row):
+    try:
+        if row["Spread Result"] not in ["WIN", "LOSS"] or row["Total Result"] not in ["WIN", "LOSS"]:
+            margin = parse_float(row["Actual Margin"])
+            total = parse_float(row["Actual Total"])
+            spread_val = parse_float(row["Model Pick (Spread)"].split()[-1])
+            total_val = parse_float(row["Model Pick (Total)"].split()[-1])
 
-    margin = score["home_score"] - score["away_score"]
-    total = score["home_score"] + score["away_score"]
-    row["Actual Margin"] = margin
-    row["Actual Total"] = total
+            if margin is not None:
+                if "Home" in row["Model Pick (Spread)"] and margin > 1.5:
+                    row["Spread Result"] = "WIN"
+                elif "Away" in row["Model Pick (Spread)"] and margin < -1.5:
+                    row["Spread Result"] = "WIN"
+                else:
+                    row["Spread Result"] = "LOSS"
 
-    if "Home" in row["Model Pick (Spread)"]:
-        line = float(row["Model Pick (Spread)"].split("-")[-1])
-        row["Spread Result"] = "WIN" if margin > line else "LOSS"
-    else:
-        line = float(row["Model Pick (Spread)"].split("+")[-1])
-        row["Spread Result"] = "WIN" if margin < -line else "LOSS"
-
-    if "Over" in row["Model Pick (Total)"]:
-        line = float(row["Model Pick (Total)"].split()[-1])
-        row["Total Result"] = "WIN" if total > line else "LOSS"
-    else:
-        line = float(row["Model Pick (Total)"].split()[-1])
-        row["Total Result"] = "WIN" if total < line else "LOSS"
+            if total is not None and total_val is not None:
+                if "Over" in row["Model Pick (Total)"] and total > total_val:
+                    row["Total Result"] = "WIN"
+                elif "Under" in row["Model Pick (Total)"] and total < total_val:
+                    row["Total Result"] = "WIN"
+                else:
+                    row["Total Result"] = "LOSS"
+    except:
+        row["Spread Result"] = "PENDING"
+        row["Total Result"] = "PENDING"
 
     return row
 
-def simulate_model_picks(game_date):
-    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={game_date}"
-    picks = []
-    try:
-        res = requests.get(url).json()
-        for game in res.get("dates", [])[0].get("games", []):
-            home = game["teams"]["home"]["team"]["name"]
-            away = game["teams"]["away"]["team"]["name"]
-            spread_pick = "Home -1.5" if len(home) > len(away) else "Away +1.5"
-            total_pick = "Over 8.5" if "a" in home.lower() else "Under 8.5"
-            picks.append({
-                "Date": pd.to_datetime(game_date),
-                "Away Team": away,
-                "Home Team": home,
-                "Model Pick (Spread)": spread_pick,
-                "Model Pick (Total)": total_pick
-            })
-    except Exception as e:
-        st.warning(f"Could not simulate picks for {game_date}: {e}")
-    return picks
+df = load_picks_log()
+if not df.empty:
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df.dropna(subset=["Date"])
+    df = df.apply(reevaluate, axis=1)
 
-def update_picks_log(game_date):
-    log_df = load_picks_log()
-    existing = set(
-        tuple(row) for row in log_df[["Date", "Away Team", "Home Team"]].values
-    )
-    new_picks = simulate_model_picks(game_date)
-    filtered = [
-        p for p in new_picks if (p["Date"], p["Away Team"], p["Home Team"]) not in existing
-    ]
-    if filtered:
-        new_df = pd.DataFrame(filtered)
-        log_df = pd.concat([log_df, new_df], ignore_index=True)
-        log_df.to_csv(PICKS_FILE, index=False)
-    return log_df
+    # Save updated file
+    df.to_csv(PICKS_FILE, index=False)
 
-def color_result(val):
-    colors = {
-        "WIN": "lightgreen",
-        "LOSS": "#ffb3b3",
-        "PENDING": "#ffffcc"
-    }
-    return f"background-color: {colors.get(val, 'white')}"
+    # Sidebar
+    st.markdown("### Select date to evaluate:")
+    selected_date = st.date_input("Date", value=date.today())
 
-# --- Backfill and evaluate full log
-log_df = load_picks_log()
-for d in pd.date_range(SEASON_START, date.today()):
-    log_df = update_picks_log(d.date())
+    filtered_df = df[df["Date"].dt.date == selected_date]
 
-log_df["Date"] = pd.to_datetime(log_df["Date"], errors="coerce")
-log_df = log_df.dropna(subset=["Date"])
-log_df = log_df.apply(evaluate_row, axis=1)
-log_df.to_csv(PICKS_FILE, index=False)
+    st.success(f"✅ Results for {selected_date.strftime('%B %d, %Y')}")
 
-# --- Daily picks view
-selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
-daily_df = log_df[log_df["Date"].dt.date == selected_day]
-
-st.subheader(f"✅ Results for {selected_day.strftime('%B %d, %Y')}")
-
-if not daily_df.empty:
-    spread_wins = (daily_df["Spread Result"] == "WIN").sum()
-    spread_losses = (daily_df["Spread Result"] == "LOSS").sum()
-    total_wins = (daily_df["Total Result"] == "WIN").sum()
-    total_losses = (daily_df["Total Result"] == "LOSS").sum()
+    spread_wins = (filtered_df["Spread Result"] == "WIN").sum()
+    spread_total = (filtered_df["Spread Result"].isin(["WIN", "LOSS"])).sum()
+    total_wins = (filtered_df["Total Result"] == "WIN").sum()
+    total_total = (filtered_df["Total Result"].isin(["WIN", "LOSS"])).sum()
 
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Spread Record", f"{spread_wins}–{spread_losses}")
+        st.markdown("**Spread Record**")
+        st.metric(label="", value=f"{spread_wins}–{spread_total - spread_wins}")
     with col2:
-        st.metric("Total Record", f"{total_wins}–{total_losses}")
+        st.markdown("**Total Record**")
+        st.metric(label="", value=f"{total_wins}–{total_total - total_wins}")
 
-    styled = daily_df.style.map(color_result, subset=["Spread Result", "Total Result"])
-    st.dataframe(styled, use_container_width=True)
+    # Highlight pending games
+    def color_result(val):
+        if val == "WIN":
+            return "background-color: #c8f7c5"
+        elif val == "LOSS":
+            return "background-color: #f4bbbb"
+        elif val == "PENDING":
+            return "background-color: #fef8cd"
+        return ""
+
+    styled_df = filtered_df.style.applymap(color_result, subset=["Spread Result", "Total Result"])
+    st.dataframe(styled_df, use_container_width=True)
+
+    # === Rolling Chart ===
+    st.markdown("### 📈 Daily Win % (History)")
+
+    win_range = st.radio("Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"], horizontal=True)
+
+    if win_range == "Last 7 Days":
+        days_back = 7
+    elif win_range == "Last 14 Days":
+        days_back = 14
+    else:
+        days_back = (date.today() - SEASON_START).days + 1
+
+    recent = df.copy()
+    recent["Date"] = pd.to_datetime(recent["Date"], errors="coerce")
+    recent = recent.dropna(subset=["Date"])
+    recent = recent[recent["Date"].dt.date >= (date.today() - timedelta(days=days_back))]
+
+    daily_stats = (
+        recent[recent["Spread Result"].isin(["WIN", "LOSS"])]
+        .groupby(recent["Date"].dt.date)
+        .agg(
+            Spread_Win_Pct=("Spread Result", lambda x: (x == "WIN").sum() / len(x) * 100),
+        )
+        .reset_index()
+        .rename(columns={"Date": "Game Date"})
+    )
+
+    total_stats = (
+        recent[recent["Total Result"].isin(["WIN", "LOSS"])]
+        .groupby(recent["Date"].dt.date)
+        .agg(
+            Total_Win_Pct=("Total Result", lambda x: (x == "WIN").sum() / len(x) * 100),
+        )
+        .reset_index()
+        .rename(columns={"Date": "Game Date"})
+    )
+
+    chart_df = pd.merge(daily_stats, total_stats, on="Game Date", how="outer").fillna(0)
+    chart_df = chart_df.sort_values(by="Game Date")
+
+    latest_spread = chart_df["Spread_Win_Pct"].iloc[-1] if not chart_df.empty else 0
+    latest_total = chart_df["Total_Win_Pct"].iloc[-1] if not chart_df.empty else 0
+
+    col1, col2 = st.columns(2)
+    col1.metric("Spread Win % (Latest)", f"{latest_spread:.1f}%")
+    col2.metric("Total Win % (Latest)", f"{latest_total:.1f}%")
+
+    fig = px.line(
+        chart_df,
+        x="Game Date",
+        y=["Spread_Win_Pct", "Total_Win_Pct"],
+        labels={"value": "Daily Win %", "variable": "Metric"},
+        title="",
+        markers=True
+    )
+    fig.update_layout(legend_title="Metric", height=400)
+    st.plotly_chart(fig, use_container_width=True)
+
 else:
-    st.info("No picks found for selected date.")
-
-# --- Win % Chart with Toggle
-st.subheader("📊 Daily Win % (History)")
-
-chart_range = st.radio("Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"], horizontal=True)
-
-chart_df = log_df.copy()
-chart_df["Date"] = chart_df["Date"].dt.date
-
-eval_df = chart_df[
-    chart_df["Spread Result"].isin(["WIN", "LOSS"]) &
-    chart_df["Total Result"].isin(["WIN", "LOSS"])
-]
-
-grouped = (
-    eval_df.groupby("Date")
-    .agg({
-        "Spread Result": lambda x: (x == "WIN").mean() * 100,
-        "Total Result": lambda x: (x == "WIN").mean() * 100
-    })
-    .rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
-)
-
-if chart_range == "Last 7 Days":
-    grouped = grouped.tail(7)
-elif chart_range == "Last 14 Days":
-    grouped = grouped.tail(14)
-# else full season = all rows
-
-if not grouped.empty:
-    latest = grouped.iloc[-1]
-    col3, col4 = st.columns(2)
-    with col3:
-        st.metric("Spread Win % (Latest)", f"{latest['Spread Win %']:.1f}%")
-    with col4:
-        st.metric("Total Win % (Latest)", f"{latest['Total Win %']:.1f}%")
-
-    chart_data = grouped.reset_index().melt(id_vars="Date", var_name="Metric", value_name="Win %")
-    chart = alt.Chart(chart_data).mark_line(point=True).encode(
-        x="Date:T",
-        y="Win %:Q",
-        color="Metric:N"
-    ).properties(height=400)
-
-    st.altair_chart(chart, use_container_width=True)
-else:
-    st.info("No win rate data available.")
+    st.warning("picks_log.csv not found or empty.")
