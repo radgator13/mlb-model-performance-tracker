@@ -105,7 +105,7 @@ elif range_option == "Last 14 Days":
 else:
     chart_df = valid_chart_df.copy()
 
-# Compute daily win %
+# Compute win %
 def compute_win_rate(day_df):
     date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
@@ -123,7 +123,7 @@ grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
 
-# Build full date range
+# Build full date range and merge
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
 history = pd.DataFrame({"Date": full_range})
 history = pd.merge(history, actual_history, on="Date", how="left")
@@ -136,7 +136,7 @@ col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === 📊 PLOTLY CHART ===
+# === 📊 PLOTLY CHART (X-axis fix applied) ===
 long_df = history.melt(id_vars=["Date"], value_vars=["Spread Win %", "Total Win %"],
                        var_name="Metric", value_name="Win %")
 
@@ -145,24 +145,28 @@ fig = px.line(
     x="Date",
     y="Win %",
     color="Metric",
-    markers=True,
     title="Daily Win % Over Time"
 )
 
+# Fix: use lines+markers for visibility and define x-axis range
+fig.update_traces(mode="lines+markers")
+
 fig.update_layout(
-    xaxis_title="Date",
-    yaxis_title="Win %",
-    yaxis=dict(range=[0, 100]),
     xaxis=dict(
+        title="Date",
+        range=[long_df["Date"].min(), long_df["Date"].max()],
         tickformat="%b %d",
-        tickmode="linear",
-        dtick="D1",  # Daily tick marks
         tickangle=-45,
         showgrid=True,
-        showline=True
+        showline=True,
+        tickfont=dict(size=10)
     ),
-    legend=dict(orientation="h", y=1.1, x=0),
-    margin=dict(l=40, r=20, t=40, b=80)
+    yaxis=dict(
+        title="Win %",
+        range=[0, 100]
+    ),
+    legend=dict(orientation="h", yanchor="bottom", y=1.1, x=0),
+    margin=dict(l=40, r=20, t=50, b=80)
 )
 
 st.plotly_chart(fig, use_container_width=True)
