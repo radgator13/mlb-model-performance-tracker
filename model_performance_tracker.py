@@ -116,7 +116,7 @@ elif range_option == "Last 14 Days":
 else:
     chart_df = valid_chart_df.copy()
 
-# Group by floored day
+# Group by day and compute win %
 grouped = chart_df.groupby("Day")
 history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 
@@ -130,10 +130,11 @@ col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# Line chart
+# Line chart (fix time-based axis labels!)
 if not history.empty:
     chart_data = history.set_index("Date")[["Spread Win %", "Total Win %"]]
-    chart_data.index = pd.to_datetime(chart_data.index)
+    chart_data.index = pd.to_datetime(chart_data.index).date  # <-- Key Fix!
+    chart_data.index.name = "Date"
     st.line_chart(chart_data, use_container_width=True)
 else:
     st.info("No win rate data to display for selected range.")
