@@ -98,7 +98,7 @@ range_option = st.radio(
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Filter by range
+# Filter by date range
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -106,7 +106,7 @@ elif range_option == "Last 14 Days":
 else:
     chart_df = valid_chart_df.copy()
 
-# Compute daily win %
+# Compute win % by day
 def compute_win_rate(day_df):
     date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
@@ -115,32 +115,29 @@ def compute_win_rate(day_df):
     t_total = day_df["Total Result"].isin(["WIN", "LOSS"]).sum()
     return {
         "Date": date,
-        "Spread Win %": s_wins / s_total * 100 if s_total else None,
-        "Total Win %": t_wins / t_total * 100 if t_total else None,
+        "Spread Win %": s_wins / s_total * 100 if s_total else 0.0,
+        "Total Win %": t_wins / t_total * 100 if t_total else 0.0,
     }
 
+# Build historical daily win %
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
-
-# Ensure datetime64[ns] types match
 actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
+
+# Full date range merge
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
 history = pd.DataFrame({"Date": pd.to_datetime(full_range, errors="coerce")})
-
-# Merge full date range with actual results
 history = pd.merge(history, actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Show metrics
+# Latest Win %
 latest = history.iloc[-1] if not history.empty else {}
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === ✅ FIXED CHART SECTION ===
-
-# Prepare long-form melted chart data to avoid Altair duplicate X-axis
+# === FIXED CHART ===
 chart_data = history.copy()
 chart_data["Date"] = pd.to_datetime(chart_data["Date"], errors="coerce")
 chart_data = chart_data.drop_duplicates(subset=["Date"]).sort_values("Date")
@@ -153,19 +150,26 @@ melted = pd.melt(
     value_name="Win %"
 )
 
-# Altair chart
+# Custom X-axis: one tick per day
+x_axis = alt.X(
+    "Date:T",
+    title="Date",
+    axis=alt.Axis(format="%b %d", labelAngle=-45, tickCount="day"),
+    scale=alt.Scale(nice="day")
+)
+
 line = alt.Chart(melted).mark_line().encode(
-    x=alt.X("Date:T", title="Date", axis=alt.Axis(format="%b %d")),
+    x=x_axis,
     y=alt.Y("Win %:Q", title="Win %", scale=alt.Scale(domain=[0, 100])),
     color="Metric:N"
 )
 
-points = alt.Chart(melted).mark_point(size=40, filled=True, opacity=0.6).encode(
+points = alt.Chart(melted).mark_point(size=40, filled=True, opacity=0.7).encode(
     x="Date:T",
     y="Win %:Q",
     color="Metric:N"
 )
 
-final_chart = (line + points).properties(width="container", height=300)
+final_chart = (line + points).properties(width="container", height=350)
 
 st.altair_chart(final_chart, use_container_width=True)
