@@ -26,6 +26,21 @@ def get_record(series):
 def format_percent(p):
     return f"{p:.1f}%" if pd.notnull(p) else "—"
 
+def confidence_level(diff):
+    if pd.isna(diff):
+        return ""
+    if diff >= 3.0:
+        return "🔥🔥🔥🔥🔥"
+    elif diff >= 2.0:
+        return "🔥🔥🔥🔥"
+    elif diff >= 1.5:
+        return "🔥🔥🔥"
+    elif diff >= 1.0:
+        return "🔥🔥"
+    elif diff >= 0.5:
+        return "🔥"
+    return ""
+
 # === STREAMLIT APP ===
 
 st.set_page_config(layout="wide")
@@ -37,6 +52,18 @@ try:
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df = df.dropna(subset=["Date"])
     df = df.sort_values("Date")
+
+    # === Add confidence levels ===
+    df["Vegas Spread"] = df["Model Pick (Spread)"].apply(lambda x: -1.5 if "Home" in str(x) else 1.5)
+    df["Vegas Total"] = df["Model Pick (Total)"].str.extract(r"(\d+\.\d+)").astype(float)
+
+    # Simulated model values — replace with real model output if available
+    df["Model Margin"] = df["Vegas Spread"]
+    df["Model Total"] = df["Vegas Total"]
+
+    df["Confidence (Spread)"] = abs(df["Model Margin"] - df["Vegas Spread"]).apply(confidence_level)
+    df["Confidence (Total)"] = abs(df["Model Total"] - df["Vegas Total"]).apply(confidence_level)
+
 except Exception as e:
     st.error(f"Failed to load picks: {e}")
     st.stop()
@@ -52,8 +79,15 @@ col1, col2 = st.columns(2)
 col1.metric("Spread Record", get_record(filtered_df["Spread Result"]))
 col2.metric("Total Record", get_record(filtered_df["Total Result"]))
 
-# Table
-styled_df = filtered_df.style.map(color_result, subset=["Spread Result", "Total Result"])
+# Table Display
+cols_to_show = [
+    "Date", "Away Team", "Home Team",
+    "Model Pick (Spread)", "Confidence (Spread)", "Spread Result",
+    "Model Pick (Total)", "Confidence (Total)", "Total Result",
+    "Actual Margin", "Actual Total"
+]
+
+styled_df = filtered_df[cols_to_show].style.map(color_result, subset=["Spread Result", "Total Result"])
 st.dataframe(styled_df, use_container_width=True)
 
 # Chart Toggle
