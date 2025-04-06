@@ -172,7 +172,7 @@ grouped = (
     })
     .rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
 )
-
+# WIN % CHART TOGGLE ADDED
 # Force last 7 calendar days
 dates = pd.date_range(end=date.today(), periods=7).date
 grouped = grouped.reindex(dates, fill_value=0).reset_index().rename(columns={"index": "Date"})
