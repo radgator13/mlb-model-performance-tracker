@@ -156,36 +156,43 @@ if not log_df.empty:
     st.subheader("📈 7-Day Rolling Win %")
 
     full_df = pd.read_csv(PICKS_FILE, parse_dates=["Date"])
-    full_df = full_df.dropna(subset=["Spread Result", "Total Result"])
-    full_df["Date"] = full_df["Date"].dt.date
+    full_df["Date"] = pd.to_datetime(full_df["Date"], errors="coerce").dt.date
 
-    daily = full_df.groupby("Date").agg({
-        "Spread Result": lambda x: (x == "WIN").sum() / len(x) * 100,
-        "Total Result": lambda x: (x == "WIN").sum() / len(x) * 100
-    }).rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
+    full_df = full_df[
+        full_df["Spread Result"].isin(["WIN", "LOSS"]) &
+        full_df["Total Result"].isin(["WIN", "LOSS"])
+    ]
 
-    daily = daily.rolling(window=7).mean().dropna().reset_index()
+    if not full_df.empty:
+        daily = full_df.groupby("Date").agg({
+            "Spread Result": lambda x: (x == "WIN").sum() / len(x) * 100,
+            "Total Result": lambda x: (x == "WIN").sum() / len(x) * 100
+        }).rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
 
-    if not daily.empty:
-        latest = daily.iloc[-1]
-        col3, col4 = st.columns(2)
-        with col3:
-            st.metric("Spread Win % (7d)", f"{latest['Spread Win %']:.1f}%")
-        with col4:
-            st.metric("Total Win % (7d)", f"{latest['Total Win %']:.1f}%")
+        rolling = daily.rolling(window=7, min_periods=1).mean().reset_index()
 
-        chart = alt.Chart(daily).transform_fold(
-            ["Spread Win %", "Total Win %"],
-            as_=["Type", "Win %"]
-        ).mark_line(point=True).encode(
-            x="Date:T",
-            y="Win %:Q",
-            color="Type:N"
-        ).properties(height=400)
+        if not rolling.empty:
+            latest = rolling.iloc[-1]
+            col3, col4 = st.columns(2)
+            with col3:
+                st.metric("Spread Win % (7d)", f"{latest['Spread Win %']:.1f}%")
+            with col4:
+                st.metric("Total Win % (7d)", f"{latest['Total Win %']:.1f}%")
 
-        st.altair_chart(chart, use_container_width=True)
+            chart = alt.Chart(rolling).transform_fold(
+                ["Spread Win %", "Total Win %"],
+                as_=["Type", "Win %"]
+            ).mark_line(point=True).encode(
+                x="Date:T",
+                y="Win %:Q",
+                color="Type:N"
+            ).properties(height=400)
+
+            st.altair_chart(chart, use_container_width=True)
+        else:
+            st.info("Not enough data yet for 7-day rolling trend.")
     else:
-        st.info("Not enough data for a 7-day trend yet.")
+        st.info("No win/loss data found yet.")
 
 else:
     st.warning("No games or picks found for this date.")
