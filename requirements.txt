@@ -1,0 +1,95 @@
+﻿import streamlit as st
+import pandas as pd
+import requests
+from datetime import date, datetime
+
+st.set_page_config(layout="wide")
+st.title("📊 MLB Model Performance Tracker")
+
+# --- Load Prediction Log ---
+@st.cache_data
+def load_picks_log():
+    try:
+        return pd.read_csv("picks_log.csv", parse_dates=["Date"])
+    except FileNotFoundError:
+        return pd.DataFrame(columns=[
+            "Date", "Matchup", "Model Pick (Spread)", "Actual Margin",
+            "Spread Result", "Model Pick (Total)", "Actual Total",
+            "Total Result"
+        ])
+
+picks_df = load_picks_log()
+
+# --- MLB API Final Scores ---
+def fetch_final_score(matchup_date: str, team_name: str):
+    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={matchup_date}"
+    res = requests.get(url).json()
+    for game in res.get("dates", [])[0].get("games", []):
+        if team_name in (game["teams"]["home"]["team"]["name"], game["teams"]["away"]["team"]["name"]):
+            return {
+                "home": game["teams"]["home"]["score"],
+                "away": game["teams"]["away"]["score"],
+                "home_team": game["teams"]["home"]["team"]["name"],
+                "away_team": game["teams"]["away"]["team"]["name"]
+            }
+    return None
+
+# --- Evaluate Picks ---
+def evaluate_row(row):
+    score = fetch_final_score(row["Date"].strftime("%Y-%m-%d"), row["Matchup"].split(" @ ")[1])
+    if score is None:
+        return row
+
+    actual_margin = score["home"] - score["away"]
+    actual_total = score["home"] + score["away"]
+
+    # Evaluate spread
+    spread_result = "PUSH"
+    if "Home" in row["Model Pick (Spread)"]:
+        spread_line = float(row["Model Pick (Spread)"].split("-")[-1])
+        spread_result = "WIN" if actual_margin > spread_line else "LOSS"
+    elif "Away" in row["Model Pick (Spread)"]:
+        spread_line = float(row["Model Pick (Spread)"].split("+")[-1])
+        spread_result = "WIN" if actual_margin < -spread_line else "LOSS"
+
+    # Evaluate total
+    total_result = "PUSH"
+    if "Over" in row["Model Pick (Total)"]:
+        line = float(row["Model Pick (Total)"].split()[1])
+        total_result = "WIN" if actual_total > line else "LOSS"
+    elif "Under" in row["Model Pick (Total)"]:
+        line = float(row["Model Pick (Total)"].split()[1])
+        total_result = "WIN" if actual_total < line else "LOSS"
+
+    row["Actual Margin"] = actual_margin
+    row["Actual Total"] = actual_total
+    row["Spread Result"] = spread_result
+    row["Total Result"] = total_result
+
+    return row
+
+# --- Evaluate & Update Picks ---
+if not picks_df.empty:
+    st.info("📦 Evaluating model picks...")
+
+    evaluated = picks_df.apply(evaluate_row, axis=1)
+    evaluated.to_csv("picks_log.csv", index=False)
+    st.success("✅ Picks evaluated and updated!")
+
+    # Display Records
+    spread_record = evaluated["Spread Result"].value_counts()
+    total_record = evaluated["Total Result"].value_counts()
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Spread Record", f"{spread_record.get('WIN',0)}–{spread_record.get('LOSS',0)}")
+        st.metric("Spread Win %", f"{(spread_record.get('WIN',0) / max(1,spread_record.sum()) * 100):.1f}%")
+
+    with col2:
+        st.metric("Total Record", f"{total_record.get('WIN',0)}–{total_record.get('LOSS',0)}")
+        st.metric("Total Win %", f"{(total_record.get('WIN',0) / max(1,total_record.sum()) * 100):.1f}%")
+
+    st.subheader("📋 Full Evaluated Log")
+    st.dataframe(evaluated, use_container_width=True)
+else:
+    st.warning("No picks found yet. Add entries to `picks_log.csv`.")
