@@ -112,11 +112,12 @@ def update_picks_log(selected_date):
         return log_df
 
 def color_result(val):
-    return f"background-color: {{
-        'WIN': 'lightgreen',
-        'LOSS': '#ffb3b3',
-        'PENDING': '#ffffcc'
-    }}".get(val, "white")
+    colors = {
+        "WIN": "lightgreen",
+        "LOSS": "#ffb3b3",
+        "PENDING": "#ffffcc"
+    }
+    return f"background-color: {colors.get(val, 'white')}"
 
 # --- Backfill and evaluate
 log_df = load_picks_log()
@@ -128,7 +129,7 @@ log_df = log_df.dropna(subset=["Date"])
 log_df = log_df.apply(evaluate_row, axis=1)
 log_df.to_csv(PICKS_FILE, index=False)
 
-# --- Date selection
+# --- Daily detail
 selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
 filtered_df = log_df[log_df["Date"].dt.date == selected_day]
 
@@ -149,7 +150,7 @@ if "Spread Result" in filtered_df.columns and "Total Result" in filtered_df.colu
 else:
     st.dataframe(filtered_df, use_container_width=True)
 
-# --- Daily Win % Chart
+# --- Daily Win % Chart (Last 7 Days)
 st.subheader("📊 Daily Win % (Last 7 Days)")
 
 chart_df = log_df.copy()
@@ -170,9 +171,9 @@ daily = (
     .fillna(0)
 )
 
-# Ensure we always show the last 7 calendar days (fill missing with 0s)
+# Ensure last 7 calendar days appear in chart
 all_dates = pd.date_range(end=date.today(), periods=7).date
-daily = daily.set_index("Date").reindex(all_dates).fillna(0).reset_index()
+daily = daily.reindex(all_dates, fill_value=0).reset_index()
 daily.rename(columns={"index": "Date"}, inplace=True)
 
 if not daily.empty:
