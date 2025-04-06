@@ -90,14 +90,14 @@ st.markdown("### 📊 Daily Win % (History)")
 range_option = st.radio(
     "Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"],
     horizontal=True,
-    index=2  # Default to Full Season
+    index=2
 )
 
-# Filter valid results
+# Valid results
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Filter by date range
+# Filter by range
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -118,25 +118,28 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else 0.0,
     }
 
-# Build full win rate history
+# Daily win history
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
 
-# Build full date range and merge
+# Merge full date range
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
 history = pd.DataFrame({"Date": full_range})
 history = pd.merge(history, actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Show daily win % metrics
-latest = history.iloc[-1] if not history.empty else {}
+# Find most recent non-zero entry
+non_zero = history[(history["Spread Win %"] > 0) | (history["Total Win %"] > 0)]
+latest = non_zero.iloc[-1] if not non_zero.empty else {}
+
+# Display latest values (NOT just today if today = 0%)
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === 📊 PLOTLY CHART (X-axis fix applied) ===
+# === PLOTLY CHART (Final Version) ===
 long_df = history.melt(id_vars=["Date"], value_vars=["Spread Win %", "Total Win %"],
                        var_name="Metric", value_name="Win %")
 
@@ -148,7 +151,7 @@ fig = px.line(
     title="Daily Win % Over Time"
 )
 
-# Fix: use lines+markers for visibility and define x-axis range
+# Add markers for all points and fix axis range
 fig.update_traces(mode="lines+markers")
 
 fig.update_layout(
