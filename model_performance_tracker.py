@@ -23,15 +23,22 @@ def load_picks_log():
 def fetch_final_score(matchup_date: str, team_name: str):
     url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={matchup_date}"
     res = requests.get(url).json()
+
     for game in res.get("dates", [])[0].get("games", []):
         if team_name in (game["teams"]["home"]["team"]["name"], game["teams"]["away"]["team"]["name"]):
+            # ✅ Only proceed if scores are available
+            if "score" not in game["teams"]["home"] or "score" not in game["teams"]["away"]:
+                return None
+
             return {
                 "home": game["teams"]["home"]["score"],
                 "away": game["teams"]["away"]["score"],
                 "home_team": game["teams"]["home"]["team"]["name"],
                 "away_team": game["teams"]["away"]["team"]["name"]
             }
+
     return None
+
 
 # --- Evaluate Row ---
 def evaluate_row(row):
