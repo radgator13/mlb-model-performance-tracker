@@ -1,4 +1,127 @@
-Date,Matchup,Model Pick (Spread),Model Pick (Total)
-2025-04-05,Cleveland Guardians @ Los Angeles Angels,Away +1.5,Under 9
-2025-04-05,Los Angeles Dodgers @ Philadelphia Phillies,Home -1.5,Over 7
-2025-04-05,Cincinnati Reds @ Milwaukee Brewers,Away +2.0,Under 14.5
+Date,Away Team,Home Team,Model Pick (Spread),Model Pick (Total),Actual Margin,Spread Result,Actual Total,Total Result
+2025-03-27,Milwaukee Brewers,New York Yankees,Away +1.5,Over 8.5,2,LOSS,6,LOSS
+2025-03-27,Baltimore Orioles,Toronto Blue Jays,Away +1.5,Over 8.5,-10,WIN,14,WIN
+2025-03-27,Boston Red Sox,Texas Rangers,Away +1.5,Over 8.5,-3,WIN,7,LOSS
+2025-03-27,Philadelphia Phillies,Washington Nationals,Away +1.5,Over 8.5,-4,WIN,10,WIN
+2025-03-27,Cleveland Guardians,Kansas City Royals,Away +1.5,Over 8.5,-3,WIN,11,WIN
+2025-03-27,New York Mets,Houston Astros,Home -1.5,Over 8.5,2,WIN,4,LOSS
+2025-03-27,San Francisco Giants,Cincinnati Reds,Away +1.5,Over 8.5,-2,WIN,10,WIN
+2025-03-27,Atlanta Braves,San Diego Padres,Home -1.5,Over 8.5,3,WIN,11,WIN
+2025-03-27,Los Angeles Angels,Chicago White Sox,Away +1.5,Over 8.5,7,LOSS,9,WIN
+2025-03-27,Pittsburgh Pirates,Miami Marlins,Away +1.5,Over 8.5,1,LOSS,9,WIN
+2025-03-27,Minnesota Twins,St. Louis Cardinals,Home -1.5,Over 8.5,2,WIN,8,LOSS
+2025-03-27,Detroit Tigers,Los Angeles Dodgers,Home -1.5,Over 8.5,1,LOSS,9,WIN
+2025-03-27,Chicago Cubs,Arizona Diamondbacks,Home -1.5,Over 8.5,-4,LOSS,16,WIN
+2025-03-27,Athletics,Seattle Mariners,Home -1.5,Over 8.5,2,WIN,6,LOSS
+2025-03-28,Colorado Rockies,Tampa Bay Rays,Away +1.5,Over 8.5,1,LOSS,5,LOSS
+2025-03-28,Baltimore Orioles,Toronto Blue Jays,Away +1.5,Over 8.5,6,LOSS,10,WIN
+2025-03-28,Pittsburgh Pirates,Miami Marlins,Away +1.5,Over 8.5,-1,LOSS,7,LOSS
+2025-03-28,Boston Red Sox,Texas Rangers,Away +1.5,Over 8.5,3,LOSS,5,LOSS
+2025-03-28,New York Mets,Houston Astros,Home -1.5,Over 8.5,-2,LOSS,4,LOSS
+2025-03-28,Chicago Cubs,Arizona Diamondbacks,Home -1.5,Over 8.5,7,WIN,9,WIN
+2025-03-28,Athletics,Seattle Mariners,Home -1.5,Over 8.5,-7,LOSS,7,LOSS
+2025-03-28,Atlanta Braves,San Diego Padres,Home -1.5,Over 8.5,1,LOSS,7,LOSS
+2025-03-28,Detroit Tigers,Los Angeles Dodgers,Home -1.5,Over 8.5,3,WIN,13,WIN
+2025-03-29,Milwaukee Brewers,New York Yankees,Away +1.5,Over 8.5,11,LOSS,29,WIN
+2025-03-29,Los Angeles Angels,Chicago White Sox,Away +1.5,Over 8.5,-1,LOSS,1,LOSS
+2025-03-29,Minnesota Twins,St. Louis Cardinals,Home -1.5,Over 8.5,4,WIN,6,LOSS
+2025-03-29,Baltimore Orioles,Toronto Blue Jays,Away +1.5,Over 8.5,-4,WIN,14,WIN
+2025-03-29,Philadelphia Phillies,Washington Nationals,Away +1.5,Over 8.5,-5,WIN,17,WIN
+2025-03-29,Cleveland Guardians,Kansas City Royals,Away +1.5,Over 8.5,1,LOSS,7,LOSS
+2025-03-29,San Francisco Giants,Cincinnati Reds,Away +1.5,Over 8.5,1,LOSS,5,LOSS
+2025-03-29,Colorado Rockies,Tampa Bay Rays,Away +1.5,Over 8.5,-1,LOSS,3,LOSS
+2025-03-29,Pittsburgh Pirates,Miami Marlins,Away +1.5,Over 8.5,1,LOSS,9,WIN
+2025-03-29,Boston Red Sox,Texas Rangers,Away +1.5,Over 8.5,1,LOSS,7,LOSS
+2025-03-29,New York Mets,Houston Astros,Home -1.5,Over 8.5,1,LOSS,3,LOSS
+2025-03-29,Atlanta Braves,San Diego Padres,Home -1.5,Over 8.5,1,LOSS,1,LOSS
+2025-03-29,Chicago Cubs,Arizona Diamondbacks,Home -1.5,Over 8.5,-1,LOSS,7,LOSS
+2025-03-29,Detroit Tigers,Los Angeles Dodgers,Home -1.5,Over 8.5,4,WIN,10,WIN
+2025-03-29,Athletics,Seattle Mariners,Home -1.5,Over 8.5,-2,LOSS,6,LOSS
+2025-03-30,Philadelphia Phillies,Washington Nationals,Away +1.5,Over 8.5,4,LOSS,6,LOSS
+2025-03-30,Milwaukee Brewers,New York Yankees,Away +1.5,Over 8.5,9,LOSS,15,WIN
+2025-03-30,Baltimore Orioles,Toronto Blue Jays,Away +1.5,Over 8.5,2,LOSS,4,LOSS
+2025-03-30,San Francisco Giants,Cincinnati Reds,Away +1.5,Over 8.5,-3,WIN,9,WIN
+2025-03-30,Colorado Rockies,Tampa Bay Rays,Away +1.5,Over 8.5,2,LOSS,10,WIN
+2025-03-30,Pittsburgh Pirates,Miami Marlins,Away +1.5,Over 8.5,1,LOSS,5,LOSS
+2025-03-30,Cleveland Guardians,Kansas City Royals,Away +1.5,Over 8.5,-4,WIN,8,LOSS
+2025-03-30,Los Angeles Angels,Chicago White Sox,Away +1.5,Over 8.5,-1,LOSS,5,LOSS
+2025-03-30,Minnesota Twins,St. Louis Cardinals,Home -1.5,Over 8.5,7,WIN,11,WIN
+2025-03-30,Boston Red Sox,Texas Rangers,Away +1.5,Over 8.5,1,LOSS,5,LOSS
+2025-03-30,Chicago Cubs,Arizona Diamondbacks,Home -1.5,Over 8.5,4,WIN,16,WIN
+2025-03-30,Athletics,Seattle Mariners,Home -1.5,Over 8.5,1,LOSS,3,LOSS
+2025-03-30,Atlanta Braves,San Diego Padres,Home -1.5,Over 8.5,5,WIN,5,LOSS
+2025-03-31,Minnesota Twins,Chicago White Sox,Home -1.5,Over 8.5,9,WIN,9,WIN
+2025-03-31,Kansas City Royals,Milwaukee Brewers,Away +1.5,Over 8.5,-10,WIN,12,WIN
+2025-03-31,Boston Red Sox,Baltimore Orioles,Home -1.5,Over 8.5,3,WIN,13,WIN
+2025-03-31,Colorado Rockies,Philadelphia Phillies,Home -1.5,Over 8.5,5,WIN,7,LOSS
+2025-03-31,Texas Rangers,Cincinnati Reds,Home -1.5,Over 8.5,11,WIN,17,WIN
+2025-03-31,New York Mets,Miami Marlins,Away +1.5,Over 8.5,-6,WIN,14,WIN
+2025-03-31,Pittsburgh Pirates,Tampa Bay Rays,Away +1.5,Over 8.5,5,LOSS,7,LOSS
+2025-03-31,Washington Nationals,Toronto Blue Jays,Away +1.5,Over 8.5,3,LOSS,7,LOSS
+2025-03-31,Los Angeles Angels,St. Louis Cardinals,Home -1.5,Over 8.5,-1,LOSS,9,WIN
+2025-03-31,San Francisco Giants,Houston Astros,Away +1.5,Over 8.5,-5,WIN,9,WIN
+2025-03-31,Cleveland Guardians,San Diego Padres,Away +1.5,Over 8.5,5,LOSS,9,WIN
+2025-03-31,Detroit Tigers,Seattle Mariners,Home -1.5,Over 8.5,-3,LOSS,15,WIN
+2025-03-31,Chicago Cubs,Athletics,Away +1.5,Over 8.5,-15,WIN,21,WIN
+2025-03-31,Atlanta Braves,Los Angeles Dodgers,Home -1.5,Over 8.5,5,WIN,7,LOSS
+2025-04-01,Texas Rangers,Cincinnati Reds,Home -1.5,Over 8.5,-1,LOSS,1,LOSS
+2025-04-01,New York Mets,Miami Marlins,Away +1.5,Over 8.5,2,LOSS,6,LOSS
+2025-04-01,Pittsburgh Pirates,Tampa Bay Rays,Away +1.5,Over 8.5,7,LOSS,7,LOSS
+2025-04-01,Arizona Diamondbacks,New York Yankees,Away +1.5,Over 8.5,-2,WIN,12,WIN
+2025-04-01,Washington Nationals,Toronto Blue Jays,Away +1.5,Over 8.5,2,LOSS,8,LOSS
+2025-04-01,Minnesota Twins,Chicago White Sox,Home -1.5,Over 8.5,-5,LOSS,11,WIN
+2025-04-01,Kansas City Royals,Milwaukee Brewers,Away +1.5,Over 8.5,5,LOSS,5,LOSS
+2025-04-01,Los Angeles Angels,St. Louis Cardinals,Home -1.5,Over 8.5,-2,LOSS,16,WIN
+2025-04-01,San Francisco Giants,Houston Astros,Away +1.5,Over 8.5,-2,WIN,4,LOSS
+2025-04-01,Cleveland Guardians,San Diego Padres,Away +1.5,Over 8.5,7,LOSS,7,LOSS
+2025-04-01,Detroit Tigers,Seattle Mariners,Home -1.5,Over 8.5,-3,LOSS,5,LOSS
+2025-04-01,Chicago Cubs,Athletics,Away +1.5,Over 8.5,-3,WIN,11,WIN
+2025-04-01,Atlanta Braves,Los Angeles Dodgers,Home -1.5,Over 8.5,2,WIN,4,LOSS
+2025-04-02,Texas Rangers,Cincinnati Reds,Home -1.5,Over 8.5,-1,LOSS,1,LOSS
+2025-04-02,Pittsburgh Pirates,Tampa Bay Rays,Away +1.5,Over 8.5,-2,WIN,6,LOSS
+2025-04-02,Kansas City Royals,Milwaukee Brewers,Away +1.5,Over 8.5,1,LOSS,5,LOSS
+2025-04-02,Los Angeles Angels,St. Louis Cardinals,Home -1.5,Over 8.5,7,WIN,17,WIN
+2025-04-02,Minnesota Twins,Chicago White Sox,Home -1.5,Over 8.5,-5,LOSS,7,LOSS
+2025-04-02,Washington Nationals,Toronto Blue Jays,Away +1.5,Over 8.5,2,LOSS,6,LOSS
+2025-04-02,Chicago Cubs,Athletics,Away +1.5,Over 8.5,-8,WIN,12,WIN
+2025-04-02,Cleveland Guardians,San Diego Padres,Away +1.5,Over 8.5,3,LOSS,7,LOSS
+2025-04-02,Detroit Tigers,Seattle Mariners,Home -1.5,Over 8.5,1,LOSS,5,LOSS
+2025-04-02,San Francisco Giants,Houston Astros,Away +1.5,Over 8.5,-3,WIN,9,WIN
+2025-04-02,New York Mets,Miami Marlins,Away +1.5,Over 8.5,-1,LOSS,11,WIN
+2025-04-02,Boston Red Sox,Baltimore Orioles,Home -1.5,Over 8.5,-3,LOSS,3,LOSS
+2025-04-02,Colorado Rockies,Philadelphia Phillies,Home -1.5,Over 8.5,4,WIN,6,LOSS
+2025-04-02,Arizona Diamondbacks,New York Yankees,Away +1.5,Over 8.5,-1,LOSS,7,LOSS
+2025-04-02,Atlanta Braves,Los Angeles Dodgers,Home -1.5,Over 8.5,1,LOSS,11,WIN
+2025-04-03,Boston Red Sox,Baltimore Orioles,Home -1.5,Over 8.5,-4,LOSS,12,WIN
+2025-04-03,Colorado Rockies,Philadelphia Phillies,Home -1.5,Over 8.5,2,WIN,4,LOSS
+2025-04-03,Houston Astros,Minnesota Twins,Home -1.5,Over 8.5,-3,LOSS,7,LOSS
+2025-04-03,Arizona Diamondbacks,New York Yankees,Away +1.5,Over 8.5,2,LOSS,16,WIN
+2025-04-03,Cincinnati Reds,Milwaukee Brewers,Home -1.5,Over 8.5,1,LOSS,1,LOSS
+2025-04-04,Chicago White Sox,Detroit Tigers,Away +1.5,Under 8.5,3,LOSS,11,LOSS
+2025-04-04,St. Louis Cardinals,Boston Red Sox,Away +1.5,Under 8.5,4,LOSS,22,LOSS
+2025-04-04,San Diego Padres,Chicago Cubs,Away +1.5,Over 8.5,2,LOSS,4,LOSS
+2025-04-04,Toronto Blue Jays,New York Mets,Away +1.5,Under 8.5,5,LOSS,5,WIN
+2025-04-04,Athletics,Colorado Rockies,Home -1.5,Over 8.5,-3,LOSS,9,WIN
+2025-04-04,New York Yankees,Pittsburgh Pirates,Home -1.5,Over 8.5,-5,LOSS,13,WIN
+2025-04-04,Seattle Mariners,San Francisco Giants,Home -1.5,Over 8.5,1,LOSS,19,WIN
+2025-04-04,Arizona Diamondbacks,Washington Nationals,Away +1.5,Over 8.5,-2,WIN,10,WIN
+2025-04-04,Los Angeles Dodgers,Philadelphia Phillies,Home -1.5,Over 8.5,1,LOSS,5,LOSS
+2025-04-04,Miami Marlins,Atlanta Braves,Home -1.5,Over 8.5,10,WIN,10,WIN
+2025-04-04,Baltimore Orioles,Kansas City Royals,Home -1.5,Over 8.5,6,WIN,10,WIN
+2025-04-04,Tampa Bay Rays,Texas Rangers,Away +1.5,Over 8.5,3,LOSS,7,LOSS
+2025-04-04,Cincinnati Reds,Milwaukee Brewers,Home -1.5,Over 8.5,1,LOSS,5,LOSS
+2025-04-04,Cleveland Guardians,Los Angeles Angels,Away +1.5,Over 8.5,-2,WIN,14,WIN
+2025-04-05,Chicago White Sox,Detroit Tigers,Away +1.5,Under 8.5,5,LOSS,9,LOSS
+2025-04-05,Houston Astros,Minnesota Twins,Home -1.5,Over 8.5,5,WIN,7,LOSS
+2025-04-05,San Diego Padres,Chicago Cubs,Away +1.5,Over 8.5,6,LOSS,8,LOSS
+2025-04-05,Arizona Diamondbacks,Washington Nationals,Away +1.5,Over 8.5,1,LOSS,7,LOSS
+2025-04-05,Los Angeles Dodgers,Philadelphia Phillies,Home -1.5,Over 8.5,-2,LOSS,4,LOSS
+2025-04-05,New York Yankees,Pittsburgh Pirates,Home -1.5,Over 8.5,-6,LOSS,14,WIN
+2025-04-05,Baltimore Orioles,Kansas City Royals,Home -1.5,Over 8.5,-7,LOSS,9,WIN
+2025-04-05,Tampa Bay Rays,Texas Rangers,Away +1.5,Over 8.5,2,LOSS,10,WIN
+2025-04-05,Toronto Blue Jays,New York Mets,Away +1.5,Under 8.5,1,LOSS,5,WIN
+2025-04-05,Cincinnati Reds,Milwaukee Brewers,Home -1.5,Over 8.5,-4,LOSS,18,WIN
+2025-04-05,Miami Marlins,Atlanta Braves,Home -1.5,Over 8.5,-4,LOSS,4,LOSS
+2025-04-05,Athletics,Colorado Rockies,Home -1.5,Over 8.5,-3,LOSS,11,WIN
+2025-04-05,Seattle Mariners,San Francisco Giants,Home -1.5,Over 8.5,3,WIN,5,LOSS
+2025-04-05,Cleveland Guardians,Los Angeles Angels,Away +1.5,Over 8.5,6,LOSS,14,WIN
