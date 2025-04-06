@@ -117,13 +117,13 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else None,
     }
 
-# Group by day and calculate actual history
+# Group by day and calculate actual win %
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 
 # Build full date range and merge with actuals
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq='D')
-history = pd.DataFrame({"Date": full_range.date})
+history = pd.DataFrame({"Date": pd.to_datetime(full_range)})  # ✅ FIX: ensure datetime64[ns]
 history = history.merge(actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
@@ -134,7 +134,7 @@ col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# Altair chart for proper X-axis
+# Altair chart for proper X-axis control
 chart_data = history.copy()
 chart_data["Date"] = pd.to_datetime(chart_data["Date"])
 
