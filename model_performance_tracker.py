@@ -1,132 +1,101 @@
-﻿import requests
+﻿import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
-import time
+import matplotlib.pyplot as plt
+from datetime import datetime
 
 # === CONFIG ===
-API_KEY = "7141524afacb4ab5a9ee8418096bfcd3"
+PICKS_FILE = "picks_log.csv"
 SEASON_START = datetime(2025, 3, 27)
-SEASON_END = datetime.today() - timedelta(days=1)
-OUTPUT_FILE = "picks_log.csv"
-REQUEST_DELAY = 0.25
 
-# === API CALLS ===
+# === UTILS ===
 
-def fetch_odds_by_date(game_date):
-    url = f"https://api.sportsdata.io/v3/mlb/odds/json/GameOddsByDate/{game_date.strftime('%Y-%m-%d')}?key={API_KEY}"
-    try:
-        r = requests.get(url)
-        data = r.json()
-        return data if isinstance(data, list) else []
-    except Exception as e:
-        print(f"❌ Odds fetch failed: {e}")
-        return []
+def color_result(val):
+    if val == "WIN":
+        return "background-color: lightgreen"
+    elif val == "LOSS":
+        return "background-color: lightcoral"
+    elif val == "PENDING":
+        return "background-color: lightyellow"
+    return ""
 
-def fetch_scores_by_date(game_date):
-    url = f"https://api.sportsdata.io/v3/mlb/scores/json/GamesByDate/{game_date.strftime('%Y-%m-%d')}?key={API_KEY}"
-    try:
-        r = requests.get(url)
-        data = r.json()
-        return data if isinstance(data, list) else []
-    except Exception as e:
-        print(f"❌ Scores fetch failed: {e}")
-        return []
+def get_record(series):
+    wins = (series == "WIN").sum()
+    losses = (series == "LOSS").sum()
+    return f"{wins}–{losses}"
 
-# === EVALUATION ===
+def format_percent(p):
+    return f"{p:.1f}%" if pd.notnull(p) else "—"
 
-def get_pregame_odds(game):
-    odds_list = game.get("PregameOdds", [])
-    if not odds_list:
-        return None, None
-    latest = sorted(odds_list, key=lambda x: x.get("Updated", ""))[-1]
-    return latest.get("HomePointSpread"), latest.get("OverUnder")
+# === STREAMLIT APP ===
 
-def get_game_score(game_id, scores_data):
-    for g in scores_data:
-        if g.get("GameID") == game_id:
-            return g.get("HomeTeamRuns"), g.get("AwayTeamRuns")
-    return None, None
+st.set_page_config(layout="wide")
+st.title("📊 MLB Model Performance Tracker")
 
-def simulate_model(home, away):
-    model_margin = len(home) - len(away)
-    model_total = 8.5 + (len(home) % 3)
-    return model_margin, model_total
+# Load and clean
+try:
+    df = pd.read_csv(PICKS_FILE)
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df.dropna(subset=["Date"])
+    df = df.sort_values("Date")
+except Exception as e:
+    st.error(f"Failed to load picks: {e}")
+    st.stop()
 
-def evaluate_spread(model_margin, vegas_spread, actual_margin):
-    model_pick = "Home -1.5" if model_margin > vegas_spread else "Away +1.5"
-    result = (
-        "WIN" if (model_pick == "Home -1.5" and actual_margin > 1.5) or
-                (model_pick == "Away +1.5" and actual_margin < -1.5)
-        else "LOSS"
-    )
-    return model_pick, result
+# Sidebar filters
+selected_date = st.date_input("Select date to evaluate:", value=datetime.today().date())
+filtered_df = df[df["Date"].dt.date == selected_date]
 
-def evaluate_total(model_total, vegas_total, actual_total):
-    model_pick = "Over " + str(vegas_total) if model_total > vegas_total else "Under " + str(vegas_total)
-    result = (
-        "WIN" if (model_pick.startswith("Over") and actual_total > vegas_total) or
-                (model_pick.startswith("Under") and actual_total < vegas_total)
-        else "LOSS"
-    )
-    return model_pick, result
+# Header: Score Summary
+st.success(f"✅ Results for {selected_date.strftime('%B %d, %Y')}")
+col1, col2 = st.columns(2)
 
-# === MAIN SCRIPT ===
+col1.metric("Spread Record", get_record(filtered_df["Spread Result"]))
+col2.metric("Total Record", get_record(filtered_df["Total Result"]))
 
-def run():
-    rows = []
-    current = SEASON_START
+# Table
+styled_df = filtered_df.style.map(color_result, subset=["Spread Result", "Total Result"])
+st.dataframe(styled_df, use_container_width=True)
 
-    while current <= SEASON_END:
-        print(f"\n🔄 {current.strftime('%Y-%m-%d')}")
-        odds_data = fetch_odds_by_date(current)
-        scores_data = fetch_scores_by_date(current)
+# Chart Toggle
+st.markdown("### 📊 Daily Win % (History)")
+range_option = st.radio(
+    "Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"], horizontal=True
+)
 
-        for game in odds_data:
-            home = game.get("HomeTeamName")
-            away = game.get("AwayTeamName")
-            game_id = game.get("GameId")
+# Win rate logic
+def compute_win_rate(day_df):
+    date = day_df["Date"].iloc[0].date()
+    s = get_record(day_df["Spread Result"])
+    t = get_record(day_df["Total Result"])
+    s_wins = (day_df["Spread Result"] == "WIN").sum()
+    s_total = day_df["Spread Result"].isin(["WIN", "LOSS"]).sum()
+    t_wins = (day_df["Total Result"] == "WIN").sum()
+    t_total = day_df["Total Result"].isin(["WIN", "LOSS"]).sum()
+    return {
+        "Date": date,
+        "Spread Win %": s_wins / s_total * 100 if s_total else None,
+        "Total Win %": t_wins / t_total * 100 if t_total else None,
+    }
 
-            if not all([home, away, game_id]):
-                print("⏩ Skipping game with missing team names or ID.")
-                continue
+if range_option == "Last 7 Days":
+    chart_df = df[df["Date"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
+elif range_option == "Last 14 Days":
+    chart_df = df[df["Date"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=13)]
+else:
+    chart_df = df.copy()
 
-            spread, total = get_pregame_odds(game)
+grouped = chart_df.groupby(chart_df["Date"].dt.date)
+history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 
-            if None in (spread, total):
-                print(f"⏩ {away} @ {home} — missing odds.")
-                continue
+# Show daily win % metrics
+latest = history.iloc[-1] if not history.empty else {}
+col1, col2 = st.columns(2)
+col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
+col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-            home_score, away_score = get_game_score(game_id, scores_data)
-            if home_score is None or away_score is None:
-                print(f"⏩ {away} @ {home} — missing scores.")
-                continue
-
-            actual_margin = home_score - away_score
-            actual_total = home_score + away_score
-
-            model_margin, model_total = simulate_model(home, away)
-            spread_pick, spread_result = evaluate_spread(model_margin, spread, actual_margin)
-            total_pick, total_result = evaluate_total(model_total, total, actual_total)
-
-            rows.append({
-                "Date": current.date(),
-                "Away Team": away,
-                "Home Team": home,
-                "Model Pick (Spread)": spread_pick,
-                "Model Pick (Total)": total_pick,
-                "Actual Margin": actual_margin,
-                "Spread Result": spread_result,
-                "Actual Total": actual_total,
-                "Total Result": total_result
-            })
-
-            time.sleep(REQUEST_DELAY)
-
-        current += timedelta(days=1)
-
-    df = pd.DataFrame(rows)
-    df.to_csv(OUTPUT_FILE, index=False)
-    print(f"\n✅ Done! {len(df)} rows written to {OUTPUT_FILE}")
-
-if __name__ == "__main__":
-    run()
+# Line chart
+if not history.empty:
+    chart_data = history.set_index("Date")[["Spread Win %", "Total Win %"]]
+    st.line_chart(chart_data, use_container_width=True)
+else:
+    st.info("No win rate data to display for selected range.")
