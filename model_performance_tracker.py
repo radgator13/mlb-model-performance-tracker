@@ -1,6 +1,6 @@
 ﻿import streamlit as st
 import pandas as pd
-import altair as alt
+import plotly.express as px
 from datetime import datetime
 
 # === CONFIG ===
@@ -93,7 +93,7 @@ range_option = st.radio(
     index=2
 )
 
-# Valid scored rows
+# Filter valid results
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
@@ -118,9 +118,10 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else 0.0,
     }
 
+# Generate full range history
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
-actual_history["Date"] = pd.to_datetime(actual_history["Date"])
+actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
 
 # Merge with full range
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
@@ -129,43 +130,31 @@ history = history.merge(actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Metrics
+# Show latest stats
 latest = history.iloc[-1] if not history.empty else {}
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === CLEAN CHART ===
+# === 🔄 PLOTLY CHART ===
+long_df = history.melt(id_vars=["Date"], value_vars=["Spread Win %", "Total Win %"],
+                       var_name="Metric", value_name="Win %")
 
-# Melt data
-chart_data = history.copy()
-melted = pd.melt(
-    chart_data,
-    id_vars=["Date"],
-    value_vars=["Spread Win %", "Total Win %"],
-    var_name="Metric",
-    value_name="Win %"
+fig = px.line(
+    long_df,
+    x="Date",
+    y="Win %",
+    color="Metric",
+    markers=True,
+    title="Daily Win % Over Time"
 )
 
-# Use Altair's natural X-axis layout
-x_axis = alt.X(
-    "Date:T",
-    title="Date",
-    axis=alt.Axis(format="%b %d", labelAngle=-45, tickCount=10)
+fig.update_layout(
+    xaxis_title="Date",
+    yaxis_title="Win %",
+    yaxis=dict(range=[0, 100]),
+    legend=dict(orientation="h", y=1.1, x=0),
+    margin=dict(l=40, r=20, t=40, b=40)
 )
 
-line = alt.Chart(melted).mark_line().encode(
-    x=x_axis,
-    y=alt.Y("Win %:Q", scale=alt.Scale(domain=[0, 100]), title="Win %"),
-    color="Metric:N"
-)
-
-points = alt.Chart(melted).mark_point(size=40, opacity=0.8, filled=True).encode(
-    x="Date:T",
-    y="Win %:Q",
-    color="Metric:N"
-)
-
-final_chart = (line + points).properties(width="container", height=350)
-
-st.altair_chart(final_chart, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True)
