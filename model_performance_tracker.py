@@ -9,7 +9,6 @@ st.title("📊 MLB Model Performance Tracker with Auto Logging")
 
 PICKS_FILE = "picks_log.csv"
 SEASON_START = date(2025, 3, 27)
-SUPPRESS_MESSAGES = True  # 👈 Set to True to suppress 'Added picks' messages
 
 @st.cache_data
 def load_picks_log():
@@ -100,8 +99,6 @@ def update_picks_log(selected_date):
     new_picks = simulate_model_picks(selected_date)
     new_entries = [p for p in new_picks if p["Matchup"] not in existing_matchups]
 
-    if new_entries and not SUPPRESS_MESSAGES:
-        st.success(f"📥 Added {len(new_entries)} new picks for {selected_date}")
     if new_entries:
         new_df = pd.DataFrame(new_entries)
         updated = pd.concat([log_df, new_df], ignore_index=True)
@@ -118,17 +115,17 @@ def color_result(val):
     }.get(val, "white")
     return f"background-color: {color}"
 
-# --- Backfill full season history from March 27 to today
+# --- Backfill full season and evaluate all picks
 log_df = load_picks_log()
 for d in pd.date_range(start=SEASON_START, end=date.today()).to_list():
     log_df = update_picks_log(d.date())
 
-# --- Evaluate everything in advance for charting
 log_df["Date"] = pd.to_datetime(log_df["Date"], errors="coerce")
 log_df = log_df.dropna(subset=["Date"])
 log_df = log_df.apply(evaluate_row, axis=1)
+log_df.to_csv(PICKS_FILE, index=False)
 
-# --- UI: Pick a single date to view
+# --- Daily Results Section ---
 selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
 filtered_df = log_df[log_df["Date"].dt.date == selected_day]
 
@@ -151,29 +148,24 @@ if "Spread Result" in filtered_df.columns and "Total Result" in filtered_df.colu
 else:
     st.dataframe(filtered_df, use_container_width=True)
 
-# --- Save updated picks_log.csv
-log_df.to_csv(PICKS_FILE, index=False)
-
 # --- Daily Win % Chart (Last 7 Days)
 st.subheader("📊 Daily Win % (Last 7 Days)")
 
-full_df = log_df.copy()
-full_df["Date"] = full_df["Date"].dt.date
+chart_df = log_df.copy()
+chart_df["Date"] = chart_df["Date"].dt.date
 
-# Group by day — count % of WINs
 daily = (
-    full_df.groupby("Date")
+    chart_df.groupby("Date")
     .agg({
         "Spread Result": lambda x: (x == "WIN").mean() * 100 if "WIN" in x.values or "LOSS" in x.values else None,
-        "Total Result": lambda x: (x == "WIN").mean() * 100 if "WIN" in x.values or "LOSS" in x.values else None,
+        "Total Result": lambda x: (x == "WIN").mean() * 100 if "WIN" in x.values or "LOSS" in x.values else None
     })
     .rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
 )
 
-# Keep only most recent 7 calendar days (even if some have no WIN/LOSS)
 daily = daily.tail(7).reset_index()
 
-if not daily.empty and "Spread Win %" in daily.columns and "Total Win %" in daily.columns:
+if not daily.empty:
     latest = daily.iloc[-1]
     col3, col4 = st.columns(2)
     with col3:
@@ -190,4 +182,4 @@ if not daily.empty and "Spread Win %" in daily.columns and "Total Win %" in dail
 
     st.altair_chart(chart, use_container_width=True)
 else:
-    st.info("Not enough data to display win rates.")
+    st.info("Not enough data to chart win rates.")
