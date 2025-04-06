@@ -139,17 +139,26 @@ col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === 📊 FINAL PLOTLY SCATTER CHART ===
+# === 📊 Plotly Chart Data Prep ===
 long_df = history.melt(
     id_vars=["Date"],
     value_vars=["Spread Win %", "Total Win %"],
     var_name="Metric",
     value_name="Win %"
 )
-
-# Tag zero vs non-zero for shape variation
 long_df["Zero"] = long_df["Win %"] == 0
 
+# === 🧪 DEBUGGING BLOCK ===
+st.markdown("### 🧪 Debug: Daily Win % History")
+st.dataframe(history)
+
+st.markdown("### 🧪 Debug: Melted Chart Data")
+st.dataframe(long_df)
+
+st.markdown("### 🧪 Debug: Non-Zero Days")
+st.dataframe(non_zero)
+
+# === 📈 Plotly Scatter Chart with Marker Clarity ===
 fig = px.scatter(
     long_df,
     x="Date",
