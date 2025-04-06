@@ -93,11 +93,11 @@ range_option = st.radio(
     index=2
 )
 
-# Valid results
+# Filter valid results
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Filter by range
+# Filter by date range
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -118,29 +118,28 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else 0.0,
     }
 
-# Daily win history
+# Build full win rate history
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
 
-# Merge full date range
+# Merge with full date range
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
 history = pd.DataFrame({"Date": full_range})
 history = pd.merge(history, actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Find most recent non-zero entry
+# Find latest non-zero win day
 non_zero = history[(history["Spread Win %"] > 0) | (history["Total Win %"] > 0)]
 latest = non_zero.iloc[-1] if not non_zero.empty else {}
 
-# Display latest values (NOT just today if today = 0%)
+# Show latest metrics
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === PLOTLY CHART (Final Version) ===
-# === 📊 PLOTLY CHART (Final Enhancement) ===
+# === 📊 FINAL PLOTLY SCATTER CHART ===
 long_df = history.melt(
     id_vars=["Date"],
     value_vars=["Spread Win %", "Total Win %"],
@@ -148,20 +147,26 @@ long_df = history.melt(
     value_name="Win %"
 )
 
-fig = px.line(
+# Tag zero vs non-zero for shape variation
+long_df["Zero"] = long_df["Win %"] == 0
+
+fig = px.scatter(
     long_df,
     x="Date",
     y="Win %",
     color="Metric",
+    symbol="Zero",
+    symbol_map={True: "x", False: "circle"},
+    color_discrete_map={
+        "Spread Win %": "deepskyblue",
+        "Total Win %": "limegreen"
+    },
     title="Daily Win % Over Time",
-    markers=True,
-    hover_data={"Win %": ".1f", "Date": True, "Metric": True}
+    hover_data={"Win %": ".1f", "Date": True, "Metric": True, "Zero": False}
 )
 
-# Add horizontal reference line at 0%
-fig.add_hline(y=0, line_width=1, line_dash="dash", line_color="gray")
+fig.update_traces(marker=dict(size=10, opacity=0.9))
 
-# Improve layout
 fig.update_layout(
     xaxis=dict(
         title="Date",
@@ -169,16 +174,15 @@ fig.update_layout(
         tickangle=-45,
         showgrid=True,
         showline=True,
-        tickfont=dict(size=10)
+        type="date"
     ),
     yaxis=dict(
         title="Win %",
-        range=[-5, 105],  # pad for visibility of points at 0 and 100
+        range=[-5, 105],
         showgrid=True
     ),
     legend=dict(orientation="h", yanchor="bottom", y=1.1, x=0),
-    margin=dict(l=40, r=20, t=50, b=80)
+    margin=dict(l=40, r=20, t=60, b=80)
 )
 
 st.plotly_chart(fig, use_container_width=True)
-
