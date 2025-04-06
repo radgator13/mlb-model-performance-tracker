@@ -25,26 +25,25 @@ def fetch_final_score(matchup_date: str, team_name: str):
     try:
         res = requests.get(url).json()
         for game in res.get("dates", [])[0].get("games", []):
-            if team_name in (game["teams"]["home"]["team"]["name"], game["teams"]["away"]["team"]["name"]):
+            home_name = game["teams"]["home"]["team"]["name"]
+            away_name = game["teams"]["away"]["team"]["name"]
+            if team_name in (home_name, away_name):
                 if "score" not in game["teams"]["home"] or "score" not in game["teams"]["away"]:
                     return None
                 return {
                     "home": game["teams"]["home"]["score"],
                     "away": game["teams"]["away"]["score"],
-                    "home_team": game["teams"]["home"]["team"]["name"],
-                    "away_team": game["teams"]["away"]["team"]["name"]
+                    "home_team": home_name,
+                    "away_team": away_name
                 }
     except Exception as e:
         st.warning(f"Score fetch error for {team_name} on {matchup_date}: {e}")
     return None
 
 def evaluate_row(row):
-    try:
-        home_team = row["Matchup"].split(" @ ")[1]
-        score = fetch_final_score(row["Date"].strftime("%Y-%m-%d"), home_team)
-    except Exception as e:
-        st.warning(f"Row eval failed: {row['Matchup']} | {e}")
-        return row
+    home_team = row["Matchup"].split(" @ ")[1]
+    matchup_date = row["Date"].strftime("%Y-%m-%d")
+    score = fetch_final_score(matchup_date, home_team)
 
     row["Actual Margin"] = "-"
     row["Spread Result"] = "PENDING"
@@ -52,7 +51,10 @@ def evaluate_row(row):
     row["Total Result"] = "PENDING"
 
     if score is None:
+        row["Debug"] = f"Missing: {home_team} @ {matchup_date}"
         return row
+
+    row["Debug"] = "Evaluated"
 
     actual_margin = score["home"] - score["away"]
     actual_total = score["home"] + score["away"]
@@ -119,7 +121,7 @@ def color_result(val):
     }
     return f"background-color: {colors.get(val, 'white')}"
 
-# --- Backfill and evaluate
+# --- Backfill and evaluate full log
 log_df = load_picks_log()
 for d in pd.date_range(start=SEASON_START, end=date.today()):
     log_df = update_picks_log(d.date())
@@ -129,7 +131,7 @@ log_df = log_df.dropna(subset=["Date"])
 log_df = log_df.apply(evaluate_row, axis=1)
 log_df.to_csv(PICKS_FILE, index=False)
 
-# --- Daily detail
+# --- Pick a day to review
 selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
 filtered_df = log_df[log_df["Date"].dt.date == selected_day]
 
@@ -150,7 +152,7 @@ if "Spread Result" in filtered_df.columns and "Total Result" in filtered_df.colu
 else:
     st.dataframe(filtered_df, use_container_width=True)
 
-# --- Daily Win % Chart (Last 7 Days)
+# --- Chart: Daily win %
 st.subheader("📊 Daily Win % (Last 7 Days)")
 
 chart_df = log_df.copy()
@@ -171,7 +173,7 @@ daily = (
     .fillna(0)
 )
 
-# Ensure last 7 calendar days appear in chart
+# Ensure full 7-day x-axis
 all_dates = pd.date_range(end=date.today(), periods=7).date
 daily = daily.reindex(all_dates, fill_value=0).reset_index()
 daily.rename(columns={"index": "Date"}, inplace=True)
@@ -193,4 +195,4 @@ if not daily.empty:
 
     st.altair_chart(chart, use_container_width=True)
 else:
-    st.info("Not enough data to chart win rates.")
+    st.info("Not enough evaluated data to chart win rates.")
