@@ -115,7 +115,7 @@ def color_result(val):
     }.get(val, "white")
     return f"background-color: {color}"
 
-# --- Auto-populate last 7 days ---
+# --- Auto-load last 7 days ---
 log_df = load_picks_log()
 for i in range(7):
     check_day = date.today() - timedelta(days=i)
@@ -133,7 +133,7 @@ if not log_df.empty:
 
     st.subheader(f"✅ Results for {selected_day.strftime('%B %d, %Y')}")
 
-    if "Spread Result" in evaluated.columns:
+    if "Spread Result" in evaluated.columns and "Total Result" in evaluated.columns:
         spread_wins = (evaluated["Spread Result"] == "WIN").sum()
         spread_losses = (evaluated["Spread Result"] == "LOSS").sum()
         total_wins = (evaluated["Total Result"] == "WIN").sum()
@@ -144,11 +144,8 @@ if not log_df.empty:
             st.metric("Spread Record", f"{spread_wins}–{spread_losses}")
         with col2:
             st.metric("Total Record", f"{total_wins}–{total_losses}")
-    else:
-        st.info("📋 No results yet — games likely haven't been played.")
 
-    if "Spread Result" in evaluated.columns and "Total Result" in evaluated.columns:
-        styled_df = evaluated.style.applymap(color_result, subset=["Spread Result", "Total Result"])
+        styled_df = evaluated.style.map(color_result, subset=["Spread Result", "Total Result"])
         st.dataframe(styled_df, use_container_width=True)
     else:
         st.dataframe(evaluated, use_container_width=True)
@@ -162,39 +159,41 @@ if not log_df.empty:
     full_df = pd.read_csv(PICKS_FILE, parse_dates=["Date"])
     full_df["Date"] = pd.to_datetime(full_df["Date"], errors="coerce").dt.date
 
-    evaluated_df = full_df[
-        full_df["Spread Result"].isin(["WIN", "LOSS"]) &
-        full_df["Total Result"].isin(["WIN", "LOSS"])
-    ]
+    if "Spread Result" in full_df.columns and "Total Result" in full_df.columns:
+        evaluated_df = full_df[
+            full_df["Spread Result"].isin(["WIN", "LOSS"]) &
+            full_df["Total Result"].isin(["WIN", "LOSS"])
+        ]
 
-    if not evaluated_df.empty:
-        daily = evaluated_df.groupby("Date").agg({
-            "Spread Result": lambda x: (x == "WIN").mean() * 100,
-            "Total Result": lambda x: (x == "WIN").mean() * 100
-        }).rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
+        if not evaluated_df.empty:
+            daily = evaluated_df.groupby("Date").agg({
+                "Spread Result": lambda x: (x == "WIN").mean() * 100,
+                "Total Result": lambda x: (x == "WIN").mean() * 100
+            }).rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
 
-        last_7 = daily.tail(7).reset_index()
+            last_7 = daily.tail(7).reset_index()
 
-        if not last_7.empty:
-            latest = last_7.iloc[-1]
-            col3, col4 = st.columns(2)
-            with col3:
-                st.metric("Spread Win % (Latest)", f"{latest['Spread Win %']:.1f}%")
-            with col4:
-                st.metric("Total Win % (Latest)", f"{latest['Total Win %']:.1f}%")
+            if not last_7.empty:
+                latest = last_7.iloc[-1]
+                col3, col4 = st.columns(2)
+                with col3:
+                    st.metric("Spread Win % (Latest)", f"{latest['Spread Win %']:.1f}%")
+                with col4:
+                    st.metric("Total Win % (Latest)", f"{latest['Total Win %']:.1f}%")
 
-            chart_data = last_7.melt(id_vars="Date", var_name="Metric", value_name="Win %")
-            chart = alt.Chart(chart_data).mark_line(point=True).encode(
-                x=alt.X("Date:T", title="Date"),
-                y=alt.Y("Win %:Q", title="Daily Win %"),
-                color="Metric:N"
-            ).properties(height=400)
+                chart_data = last_7.melt(id_vars="Date", var_name="Metric", value_name="Win %")
+                chart = alt.Chart(chart_data).mark_line(point=True).encode(
+                    x=alt.X("Date:T", title="Date"),
+                    y=alt.Y("Win %:Q", title="Daily Win %"),
+                    color="Metric:N"
+                ).properties(height=400)
 
-            st.altair_chart(chart, use_container_width=True)
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.info("Not enough data to chart daily win rates.")
         else:
-            st.info("Not enough data to chart daily win rates.")
+            st.info("No evaluated picks yet to chart.")
     else:
-        st.info("No evaluated picks yet to show win rate chart.")
-
+        st.info("Insufficient data to calculate win rates.")
 else:
-    st.warning("No games or picks found for this date.")
+    st.warning("No picks found.")
