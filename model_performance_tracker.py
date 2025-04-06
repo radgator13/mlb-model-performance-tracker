@@ -94,11 +94,11 @@ range_option = st.radio(
     index=2
 )
 
-# Only scored rows
+# Filter valid scored picks
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Filter by range
+# Date range filtering
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -106,7 +106,7 @@ elif range_option == "Last 14 Days":
 else:
     chart_df = valid_chart_df.copy()
 
-# Daily win rate
+# Compute daily win %
 def compute_win_rate(day_df):
     date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
@@ -123,20 +123,22 @@ grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
 
-# Full range + merge
+# Build full date range and merge
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
 history = pd.DataFrame({"Date": pd.to_datetime(full_range, errors="coerce")})
 history = pd.merge(history, actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Show metrics
+# Show latest stats
 latest = history.iloc[-1] if not history.empty else {}
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === FIXED X-AXIS CONTROL ===
+# === CHART SECTION WITH CLEAN TICKS ===
+
+# Prepare long-form data
 chart_data = history.copy()
 chart_data = chart_data.sort_values("Date")
 melted = pd.melt(
@@ -147,8 +149,21 @@ melted = pd.melt(
     value_name="Win %"
 )
 
-# Generate a full list of unique daily ticks
-tick_dates = chart_data["Date"].dt.normalize().unique().tolist()
+# Clean ticks
+tick_dates = (
+    chart_data["Date"]
+    .dropna()
+    .drop_duplicates()
+    .dt.floor("D")
+    .sort_values()
+    .tolist()
+)
+
+# Optional: limit total ticks to avoid clutter
+max_ticks = 60
+if len(tick_dates) > max_ticks:
+    step = len(tick_dates) // max_ticks
+    tick_dates = tick_dates[::step]
 
 x_axis = alt.X(
     "Date:T",
@@ -157,6 +172,7 @@ x_axis = alt.X(
     scale=alt.Scale(domain=[chart_data["Date"].min(), chart_data["Date"].max()])
 )
 
+# Build Altair chart
 line = alt.Chart(melted).mark_line().encode(
     x=x_axis,
     y=alt.Y("Win %:Q", title="Win %", scale=alt.Scale(domain=[0, 100])),
