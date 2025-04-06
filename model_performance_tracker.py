@@ -1,6 +1,7 @@
 ﻿import streamlit as st
 import pandas as pd
 import requests
+import os
 from datetime import date, timedelta
 import altair as alt
 
@@ -10,16 +11,20 @@ st.title("📊 MLB Model Performance Tracker")
 PICKS_FILE = "picks_log.csv"
 SEASON_START = date(2025, 3, 27)
 
-@st.cache_data
-def load_picks_log():
-    try:
-        return pd.read_csv(PICKS_FILE, parse_dates=["Date"])
-    except FileNotFoundError:
-        return pd.DataFrame(columns=[
+# --- Ensure picks_log.csv exists with correct structure
+def initialize_log_file():
+    if not os.path.exists(PICKS_FILE):
+        columns = [
             "Date", "Away Team", "Home Team",
             "Model Pick (Spread)", "Model Pick (Total)",
             "Actual Margin", "Spread Result", "Actual Total", "Total Result"
-        ])
+        ]
+        pd.DataFrame(columns=columns).to_csv(PICKS_FILE, index=False)
+
+@st.cache_data
+def load_picks_log():
+    initialize_log_file()
+    return pd.read_csv(PICKS_FILE, parse_dates=["Date"])
 
 def fetch_final_score(game_date: str, home_team: str, away_team: str):
     url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={game_date}"
@@ -78,7 +83,6 @@ def simulate_model_picks(game_date):
             home = game["teams"]["home"]["team"]["name"]
             away = game["teams"]["away"]["team"]["name"]
 
-            # Dummy model logic
             spread_pick = "Home -1.5" if len(home) > len(away) else "Away +1.5"
             total_pick = "Over 8.5" if "a" in home.lower() else "Under 8.5"
 
@@ -109,9 +113,14 @@ def update_picks_log(game_date):
     return log_df
 
 def color_result(val):
-    return f"background-color: { {'WIN': 'lightgreen', 'LOSS': '#ffb3b3', 'PENDING': '#ffffcc'}.get(val, 'white') }"
+    colors = {
+        "WIN": "lightgreen",
+        "LOSS": "#ffb3b3",
+        "PENDING": "#ffffcc"
+    }
+    return f"background-color: {colors.get(val, 'white')}"
 
-# --- Backfill & evaluate full log
+# --- Backfill and evaluate full log
 log_df = load_picks_log()
 for d in pd.date_range(SEASON_START, date.today()):
     log_df = update_picks_log(d.date())
@@ -121,7 +130,7 @@ log_df = log_df.dropna(subset=["Date"])
 log_df = log_df.apply(evaluate_row, axis=1)
 log_df.to_csv(PICKS_FILE, index=False)
 
-# --- Show day picker
+# --- Daily evaluation
 selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
 daily_df = log_df[log_df["Date"].dt.date == selected_day]
 
@@ -164,7 +173,7 @@ grouped = (
     .rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
 )
 
-# Force 7-day range
+# Force last 7 calendar days
 dates = pd.date_range(end=date.today(), periods=7).date
 grouped = grouped.reindex(dates, fill_value=0).reset_index().rename(columns={"index": "Date"})
 
