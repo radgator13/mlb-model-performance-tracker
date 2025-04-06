@@ -6,12 +6,11 @@ from datetime import date, timedelta
 import altair as alt
 
 st.set_page_config(layout="wide")
-st.title("📊 MLB Model Performance Tracker")
+st.title("📊 MLB Model Performance Tracker — with Chart Toggle ✅")  # ← Added to force Git update
 
 PICKS_FILE = "picks_log.csv"
 SEASON_START = date(2025, 3, 27)
 
-# --- Ensure picks_log.csv exists with correct structure
 def initialize_log_file():
     if not os.path.exists(PICKS_FILE):
         columns = [
@@ -82,10 +81,8 @@ def simulate_model_picks(game_date):
         for game in res.get("dates", [])[0].get("games", []):
             home = game["teams"]["home"]["team"]["name"]
             away = game["teams"]["away"]["team"]["name"]
-
             spread_pick = "Home -1.5" if len(home) > len(away) else "Away +1.5"
             total_pick = "Over 8.5" if "a" in home.lower() else "Under 8.5"
-
             picks.append({
                 "Date": pd.to_datetime(game_date),
                 "Away Team": away,
@@ -130,7 +127,7 @@ log_df = log_df.dropna(subset=["Date"])
 log_df = log_df.apply(evaluate_row, axis=1)
 log_df.to_csv(PICKS_FILE, index=False)
 
-# --- Daily evaluation
+# --- Daily picks view
 selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
 daily_df = log_df[log_df["Date"].dt.date == selected_day]
 
@@ -153,8 +150,10 @@ if not daily_df.empty:
 else:
     st.info("No picks found for selected date.")
 
-# --- Win % Chart (7 Days)
-st.subheader("📊 Daily Win % (Last 7 Days)")
+# --- Win % Chart with Toggle
+st.subheader("📊 Daily Win % (History)")
+
+chart_range = st.radio("Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"], horizontal=True)
 
 chart_df = log_df.copy()
 chart_df["Date"] = chart_df["Date"].dt.date
@@ -172,11 +171,13 @@ grouped = (
     })
     .rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
 )
-# WIN % CHART TOGGLE ADDED
-# Force last 7 calendar days
-dates = pd.date_range(end=date.today(), periods=7).date
-grouped = grouped.reindex(dates, fill_value=0).reset_index().rename(columns={"index": "Date"})
-# Win % toggle added ✅
+
+if chart_range == "Last 7 Days":
+    grouped = grouped.tail(7)
+elif chart_range == "Last 14 Days":
+    grouped = grouped.tail(14)
+# else full season = all rows
+
 if not grouped.empty:
     latest = grouped.iloc[-1]
     col3, col4 = st.columns(2)
@@ -185,8 +186,8 @@ if not grouped.empty:
     with col4:
         st.metric("Total Win % (Latest)", f"{latest['Total Win %']:.1f}%")
 
-    melt = grouped.melt(id_vars="Date", var_name="Metric", value_name="Win %")
-    chart = alt.Chart(melt).mark_line(point=True).encode(
+    chart_data = grouped.reset_index().melt(id_vars="Date", var_name="Metric", value_name="Win %")
+    chart = alt.Chart(chart_data).mark_line(point=True).encode(
         x="Date:T",
         y="Win %:Q",
         color="Metric:N"
