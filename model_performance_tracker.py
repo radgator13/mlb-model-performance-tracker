@@ -36,12 +36,10 @@ def fetch_final_score(matchup_date: str, team_name: str):
 
 def evaluate_row(row):
     score = fetch_final_score(row["Date"].strftime("%Y-%m-%d"), row["Matchup"].split(" @ ")[1])
-    
     row["Actual Margin"] = "-"
     row["Spread Result"] = "PENDING"
     row["Actual Total"] = "-"
     row["Total Result"] = "PENDING"
-
     if score is None:
         return row
 
@@ -108,7 +106,6 @@ def update_picks_log(selected_date):
         updated.to_csv(PICKS_FILE, index=False)
         return updated
     else:
-        st.info("No new picks to add for this date.")
         return log_df
 
 def color_result(val):
@@ -119,14 +116,18 @@ def color_result(val):
     }.get(val, "white")
     return f"background-color: {color}"
 
+# --- Auto-populate last 7 days of picks ---
+log_df = load_picks_log()
+for i in range(7):
+    check_day = date.today() - timedelta(days=i)
+    log_df = update_picks_log(check_day)
+
 # --- Main App ---
 selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
-log_df = update_picks_log(selected_day)
 
 if not log_df.empty:
     log_df["Date"] = pd.to_datetime(log_df["Date"], errors="coerce")
     log_df = log_df.dropna(subset=["Date"])
-
     filtered_df = log_df[log_df["Date"].dt.date == selected_day]
     evaluated = filtered_df.apply(evaluate_row, axis=1)
 
