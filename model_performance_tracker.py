@@ -18,17 +18,6 @@ def color_result(val):
         return "background-color: lightyellow"
     return ""
 
-def format_confidence(val):
-    if pd.isnull(val):
-        return ""
-    if val >= 3:
-        return "🔥🔥🔥"
-    elif val >= 2:
-        return "🔥🔥"
-    elif val >= 1:
-        return "🔥"
-    return ""
-
 def get_record(series):
     wins = (series == "WIN").sum()
     losses = (series == "LOSS").sum()
@@ -36,6 +25,25 @@ def get_record(series):
 
 def format_percent(p):
     return f"{p:.1f}%" if pd.notnull(p) else "—"
+
+def confidence_score(pick, value):
+    try:
+        if "Over" in pick or "Under" in pick:
+            diff = abs(float(pick.split()[1]) - float(value))
+        else:
+            diff = abs(float(value))
+        if diff >= 3.0:
+            return "🔥🔥🔥🔥🔥"
+        elif diff >= 2.5:
+            return "🔥🔥🔥🔥"
+        elif diff >= 2.0:
+            return "🔥🔥🔥"
+        elif diff >= 1.5:
+            return "🔥🔥"
+        else:
+            return "🔥"
+    except:
+        return "—"
 
 # === STREAMLIT APP ===
 
@@ -54,23 +62,25 @@ except Exception as e:
 
 # Sidebar filters
 selected_date = st.date_input("Select date to evaluate:", value=datetime.today().date())
-filtered_df = df[df["Date"].dt.date == selected_date]
+filtered_df = df[df["Date"].dt.date == selected_date].copy()
+
+# Add Confidence columns
+if not filtered_df.empty:
+    filtered_df["Confidence (Spread)"] = filtered_df.apply(
+        lambda row: confidence_score(row["Model Pick (Spread)"], row["Actual Margin"]), axis=1
+    )
+    filtered_df["Confidence (Total)"] = filtered_df.apply(
+        lambda row: confidence_score(row["Model Pick (Total)"], row["Actual Total"]), axis=1
+    )
 
 # Header: Score Summary
 st.success(f"✅ Results for {selected_date.strftime('%B %d, %Y')}")
 col1, col2 = st.columns(2)
-
 col1.metric("Spread Record", get_record(filtered_df["Spread Result"]))
 col2.metric("Total Record", get_record(filtered_df["Total Result"]))
 
-# Format confidence columns with fireballs
-display_df = filtered_df.copy()
-if "Confidence (Spread)" in display_df.columns:
-    display_df["Confidence (Spread)"] = display_df["Confidence (Spread)"].apply(format_confidence)
-if "Confidence (Total)" in display_df.columns:
-    display_df["Confidence (Total)"] = display_df["Confidence (Total)"].apply(format_confidence)
-
-styled_df = display_df.style.map(color_result, subset=["Spread Result", "Total Result"])
+# Table
+styled_df = filtered_df.style.map(color_result, subset=["Spread Result", "Total Result"])
 st.dataframe(styled_df, use_container_width=True)
 
 # Chart Toggle
@@ -82,8 +92,6 @@ range_option = st.radio(
 # Win rate logic
 def compute_win_rate(day_df):
     date = day_df["Date"].iloc[0].date()
-    s = get_record(day_df["Spread Result"])
-    t = get_record(day_df["Total Result"])
     s_wins = (day_df["Spread Result"] == "WIN").sum()
     s_total = day_df["Spread Result"].isin(["WIN", "LOSS"]).sum()
     t_wins = (day_df["Total Result"] == "WIN").sum()
