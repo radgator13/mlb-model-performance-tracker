@@ -94,7 +94,7 @@ valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result
 
 # Win rate logic
 def compute_win_rate(day_df):
-    date = day_df["Date"].iloc[0].date()
+    date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
     s_total = day_df["Spread Result"].isin(["WIN", "LOSS"]).sum()
     t_wins = (day_df["Total Result"] == "WIN").sum()
@@ -105,15 +105,19 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else None,
     }
 
+# Floor to date (strip time) for clean daily grouping
+valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
+
 # Apply chart range filter
 if range_option == "Last 7 Days":
-    chart_df = valid_chart_df[valid_chart_df["Date"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
+    chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
-    chart_df = valid_chart_df[valid_chart_df["Date"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=13)]
+    chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=13)]
 else:
     chart_df = valid_chart_df.copy()
 
-grouped = chart_df.groupby(chart_df["Date"].dt.date)
+# Group by floored day
+grouped = chart_df.groupby("Day")
 history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 
 # Fill NaNs with 0.0% for flatline visualization
@@ -126,12 +130,10 @@ col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# Debug: Show raw history table if needed
-# st.dataframe(history)
-
 # Line chart
 if not history.empty:
     chart_data = history.set_index("Date")[["Spread Win %", "Total Win %"]]
+    chart_data.index = pd.to_datetime(chart_data.index)
     st.line_chart(chart_data, use_container_width=True)
 else:
     st.info("No win rate data to display for selected range.")
