@@ -152,8 +152,8 @@ if not log_df.empty:
     final_log = pd.concat([log_df[log_df["Date"].dt.date != selected_day], evaluated])
     final_log.to_csv(PICKS_FILE, index=False)
 
-    # --- Rolling Performance Chart (Last 7 Days) ---
-    st.subheader("📈 7-Day Rolling Win %")
+    # --- Daily Win Rate Chart (Last 7 Days) ---
+    st.subheader("📊 Daily Win % (Last 7 Days)")
 
     full_df = pd.read_csv(PICKS_FILE, parse_dates=["Date"])
     full_df["Date"] = pd.to_datetime(full_df["Date"], errors="coerce").dt.date
@@ -169,30 +169,30 @@ if not log_df.empty:
             "Total Result": lambda x: (x == "WIN").sum() / len(x) * 100
         }).rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
 
-        rolling = daily.rolling(window=7, min_periods=1).mean().reset_index()
+        last_7 = daily.tail(7).reset_index()
 
-        if not rolling.empty:
-            latest = rolling.iloc[-1]
+        if not last_7.empty:
+            latest = last_7.iloc[-1]
             col3, col4 = st.columns(2)
             with col3:
-                st.metric("Spread Win % (7d)", f"{latest['Spread Win %']:.1f}%")
+                st.metric("Spread Win % (Latest)", f"{latest['Spread Win %']:.1f}%")
             with col4:
-                st.metric("Total Win % (7d)", f"{latest['Total Win %']:.1f}%")
+                st.metric("Total Win % (Latest)", f"{latest['Total Win %']:.1f}%")
 
-            chart = alt.Chart(rolling).transform_fold(
-                ["Spread Win %", "Total Win %"],
-                as_=["Type", "Win %"]
-            ).mark_line(point=True).encode(
-                x="Date:T",
-                y="Win %:Q",
-                color="Type:N"
+            chart_data = last_7.melt(id_vars="Date", value_vars=["Spread Win %", "Total Win %"],
+                                     var_name="Metric", value_name="Win %")
+
+            chart = alt.Chart(chart_data).mark_line(point=True).encode(
+                x=alt.X("Date:T", title="Date"),
+                y=alt.Y("Win %:Q", title="Daily Win %"),
+                color="Metric:N"
             ).properties(height=400)
 
             st.altair_chart(chart, use_container_width=True)
         else:
-            st.info("Not enough data yet for 7-day rolling trend.")
+            st.info("Not enough daily data yet.")
     else:
-        st.info("No win/loss data found yet.")
+        st.info("No evaluated picks yet to show win rates.")
 
 else:
     st.warning("No games or picks found for this date.")
