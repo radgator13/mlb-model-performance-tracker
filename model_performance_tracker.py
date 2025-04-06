@@ -8,6 +8,7 @@ st.set_page_config(layout="wide")
 st.title("📊 MLB Model Performance Tracker with Auto Logging")
 
 PICKS_FILE = "picks_log.csv"
+SEASON_START = date(2025, 3, 27)
 
 @st.cache_data
 def load_picks_log():
@@ -115,11 +116,10 @@ def color_result(val):
     }.get(val, "white")
     return f"background-color: {color}"
 
-# --- Auto-load last 7 days ---
+# --- Backfill from SEASON_START to today
 log_df = load_picks_log()
-for i in range(7):
-    check_day = date.today() - timedelta(days=i)
-    log_df = update_picks_log(check_day)
+for d in pd.date_range(start=SEASON_START, end=date.today()).to_list():
+    log_df = update_picks_log(d.date())
 
 # --- Main App ---
 selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
