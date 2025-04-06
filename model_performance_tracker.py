@@ -135,6 +135,18 @@ if not history.empty:
     chart_data = history.set_index("Date")[["Spread Win %", "Total Win %"]]
     chart_data.index = pd.to_datetime(chart_data.index).date  # <-- Key Fix!
     chart_data.index.name = "Date"
-    st.line_chart(chart_data, use_container_width=True)
-else:
-    st.info("No win rate data to display for selected range.")
+    import altair as alt
+
+chart_data = history.copy()
+chart_data["Date"] = pd.to_datetime(chart_data["Date"])
+base = alt.Chart(chart_data).mark_line(point=True).encode(
+    x=alt.X("Date:T", title="Date", axis=alt.Axis(format="%b %d")),
+    y=alt.Y("value:Q", title="Win %"),
+    color="metric:N"
+).transform_fold(
+    ["Spread Win %", "Total Win %"],
+    as_=["metric", "value"]
+).properties(width="container", height=300)
+
+st.altair_chart(base, use_container_width=True)
+
