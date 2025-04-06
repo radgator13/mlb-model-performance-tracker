@@ -115,9 +115,9 @@ def color_result(val):
     }.get(val, "white")
     return f"background-color: {color}"
 
-# --- Backfill full season and evaluate all picks
+# --- Backfill from March 27 to today, then evaluate everything
 log_df = load_picks_log()
-for d in pd.date_range(start=SEASON_START, end=date.today()).to_list():
+for d in pd.date_range(start=SEASON_START, end=date.today()):
     log_df = update_picks_log(d.date())
 
 log_df["Date"] = pd.to_datetime(log_df["Date"], errors="coerce")
@@ -125,7 +125,7 @@ log_df = log_df.dropna(subset=["Date"])
 log_df = log_df.apply(evaluate_row, axis=1)
 log_df.to_csv(PICKS_FILE, index=False)
 
-# --- Daily Results Section ---
+# --- Select a day to review
 selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
 filtered_df = log_df[log_df["Date"].dt.date == selected_day]
 
@@ -154,24 +154,33 @@ st.subheader("📊 Daily Win % (Last 7 Days)")
 chart_df = log_df.copy()
 chart_df["Date"] = chart_df["Date"].dt.date
 
+# Only include evaluated picks (not PENDING)
+evaluated_df = chart_df[
+    chart_df["Spread Result"].isin(["WIN", "LOSS"]) &
+    chart_df["Total Result"].isin(["WIN", "LOSS"])
+]
+
+# Group and calculate daily win %
 daily = (
-    chart_df.groupby("Date")
+    evaluated_df.groupby("Date")
     .agg({
-        "Spread Result": lambda x: (x == "WIN").mean() * 100 if "WIN" in x.values or "LOSS" in x.values else None,
-        "Total Result": lambda x: (x == "WIN").mean() * 100 if "WIN" in x.values or "LOSS" in x.values else None
+        "Spread Result": lambda x: (x == "WIN").mean() * 100,
+        "Total Result": lambda x: (x == "WIN").mean() * 100
     })
     .rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
+    .fillna(0)
 )
 
+# Ensure chart has up to 7 most recent calendar days
 daily = daily.tail(7).reset_index()
 
 if not daily.empty:
     latest = daily.iloc[-1]
     col3, col4 = st.columns(2)
     with col3:
-        st.metric("Spread Win % (Latest)", f"{latest['Spread Win %'] or 0:.1f}%")
+        st.metric("Spread Win % (Latest)", f"{latest['Spread Win %']:.1f}%")
     with col4:
-        st.metric("Total Win % (Latest)", f"{latest['Total Win %'] or 0:.1f}%")
+        st.metric("Total Win % (Latest)", f"{latest['Total Win %']:.1f}%")
 
     chart_data = daily.melt(id_vars="Date", var_name="Metric", value_name="Win %")
     chart = alt.Chart(chart_data).mark_line(point=True).encode(
@@ -182,4 +191,4 @@ if not daily.empty:
 
     st.altair_chart(chart, use_container_width=True)
 else:
-    st.info("Not enough data to chart win rates.")
+    st.info("Not enough evaluated data to chart win rates.")
