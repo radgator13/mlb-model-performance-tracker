@@ -1,6 +1,5 @@
 ﻿import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import altair as alt
 from datetime import datetime
 
@@ -94,11 +93,11 @@ range_option = st.radio(
     index=2
 )
 
-# Filter valid scored picks
+# Valid scored rows
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Date range filtering
+# Filter by range
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -106,7 +105,7 @@ elif range_option == "Last 14 Days":
 else:
     chart_df = valid_chart_df.copy()
 
-# Compute daily win %
+# Compute win %
 def compute_win_rate(day_df):
     date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
@@ -121,26 +120,25 @@ def compute_win_rate(day_df):
 
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
-actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
+actual_history["Date"] = pd.to_datetime(actual_history["Date"])
 
-# Build full date range and merge
+# Merge with full range
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
-history = pd.DataFrame({"Date": pd.to_datetime(full_range, errors="coerce")})
-history = pd.merge(history, actual_history, on="Date", how="left")
+history = pd.DataFrame({"Date": full_range})
+history = history.merge(actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Show latest stats
+# Metrics
 latest = history.iloc[-1] if not history.empty else {}
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === CHART SECTION WITH CLEAN TICKS ===
+# === CLEAN CHART ===
 
-# Prepare long-form data
+# Melt data
 chart_data = history.copy()
-chart_data = chart_data.sort_values("Date")
 melted = pd.melt(
     chart_data,
     id_vars=["Date"],
@@ -149,37 +147,20 @@ melted = pd.melt(
     value_name="Win %"
 )
 
-# Clean ticks
-tick_dates = (
-    chart_data["Date"]
-    .dropna()
-    .drop_duplicates()
-    .dt.floor("D")
-    .sort_values()
-    .tolist()
-)
-
-# Optional: limit total ticks to avoid clutter
-max_ticks = 60
-if len(tick_dates) > max_ticks:
-    step = len(tick_dates) // max_ticks
-    tick_dates = tick_dates[::step]
-
+# Use Altair's natural X-axis layout
 x_axis = alt.X(
     "Date:T",
     title="Date",
-    axis=alt.Axis(format="%b %d", labelAngle=-45, values=tick_dates),
-    scale=alt.Scale(domain=[chart_data["Date"].min(), chart_data["Date"].max()])
+    axis=alt.Axis(format="%b %d", labelAngle=-45, tickCount=10)
 )
 
-# Build Altair chart
 line = alt.Chart(melted).mark_line().encode(
     x=x_axis,
-    y=alt.Y("Win %:Q", title="Win %", scale=alt.Scale(domain=[0, 100])),
+    y=alt.Y("Win %:Q", scale=alt.Scale(domain=[0, 100]), title="Win %"),
     color="Metric:N"
 )
 
-points = alt.Chart(melted).mark_point(size=40, filled=True, opacity=0.7).encode(
+points = alt.Chart(melted).mark_point(size=40, opacity=0.8, filled=True).encode(
     x="Date:T",
     y="Win %:Q",
     color="Metric:N"
