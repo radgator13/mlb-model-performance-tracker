@@ -91,14 +91,14 @@ st.markdown("### 📊 Daily Win % (History)")
 range_option = st.radio(
     "Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"],
     horizontal=True,
-    index=2  # Default to Full Season
+    index=2
 )
 
 # Only scored rows
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Filter by date range
+# Filter by range
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -106,7 +106,7 @@ elif range_option == "Last 14 Days":
 else:
     chart_df = valid_chart_df.copy()
 
-# Compute win % by day
+# Daily win rate
 def compute_win_rate(day_df):
     date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
@@ -119,29 +119,26 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else 0.0,
     }
 
-# Build historical daily win %
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
 
-# Full date range merge
+# Full range + merge
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
 history = pd.DataFrame({"Date": pd.to_datetime(full_range, errors="coerce")})
 history = pd.merge(history, actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Latest Win %
+# Show metrics
 latest = history.iloc[-1] if not history.empty else {}
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === FIXED CHART ===
+# === FIXED X-AXIS CONTROL ===
 chart_data = history.copy()
-chart_data["Date"] = pd.to_datetime(chart_data["Date"], errors="coerce")
-chart_data = chart_data.drop_duplicates(subset=["Date"]).sort_values("Date")
-
+chart_data = chart_data.sort_values("Date")
 melted = pd.melt(
     chart_data,
     id_vars=["Date"],
@@ -150,12 +147,14 @@ melted = pd.melt(
     value_name="Win %"
 )
 
-# Custom X-axis: one tick per day
+# Generate a full list of unique daily ticks
+tick_dates = chart_data["Date"].dt.normalize().unique().tolist()
+
 x_axis = alt.X(
     "Date:T",
     title="Date",
-    axis=alt.Axis(format="%b %d", labelAngle=-45, tickCount="day"),
-    scale=alt.Scale(nice="day")
+    axis=alt.Axis(format="%b %d", labelAngle=-45, values=tick_dates),
+    scale=alt.Scale(domain=[chart_data["Date"].min(), chart_data["Date"].max()])
 )
 
 line = alt.Chart(melted).mark_line().encode(
