@@ -152,21 +152,21 @@ if not log_df.empty:
     final_log = pd.concat([log_df[log_df["Date"].dt.date != selected_day], evaluated])
     final_log.to_csv(PICKS_FILE, index=False)
 
-    # --- Daily Win Rate Chart (Last 7 Days) ---
+    # --- Daily Win % Chart (Last 7 Days) ---
     st.subheader("📊 Daily Win % (Last 7 Days)")
 
     full_df = pd.read_csv(PICKS_FILE, parse_dates=["Date"])
     full_df["Date"] = pd.to_datetime(full_df["Date"], errors="coerce").dt.date
 
-    full_df = full_df[
+    evaluated_df = full_df[
         full_df["Spread Result"].isin(["WIN", "LOSS"]) &
         full_df["Total Result"].isin(["WIN", "LOSS"])
     ]
 
-    if not full_df.empty:
-        daily = full_df.groupby("Date").agg({
-            "Spread Result": lambda x: (x == "WIN").sum() / len(x) * 100,
-            "Total Result": lambda x: (x == "WIN").sum() / len(x) * 100
+    if not evaluated_df.empty:
+        daily = evaluated_df.groupby("Date").agg({
+            "Spread Result": lambda x: (x == "WIN").mean() * 100,
+            "Total Result": lambda x: (x == "WIN").mean() * 100
         }).rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
 
         last_7 = daily.tail(7).reset_index()
@@ -179,9 +179,7 @@ if not log_df.empty:
             with col4:
                 st.metric("Total Win % (Latest)", f"{latest['Total Win %']:.1f}%")
 
-            chart_data = last_7.melt(id_vars="Date", value_vars=["Spread Win %", "Total Win %"],
-                                     var_name="Metric", value_name="Win %")
-
+            chart_data = last_7.melt(id_vars="Date", var_name="Metric", value_name="Win %")
             chart = alt.Chart(chart_data).mark_line(point=True).encode(
                 x=alt.X("Date:T", title="Date"),
                 y=alt.Y("Win %:Q", title="Daily Win %"),
@@ -190,9 +188,9 @@ if not log_df.empty:
 
             st.altair_chart(chart, use_container_width=True)
         else:
-            st.info("Not enough daily data yet.")
+            st.info("Not enough data to chart daily win rates.")
     else:
-        st.info("No evaluated picks yet to show win rates.")
+        st.info("No evaluated picks yet to show win rate chart.")
 
 else:
     st.warning("No games or picks found for this date.")
