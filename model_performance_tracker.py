@@ -2,6 +2,7 @@
 import pandas as pd
 import requests
 from datetime import date, timedelta
+import altair as alt
 
 st.set_page_config(layout="wide")
 st.title("📊 MLB Model Performance Tracker with Auto Logging")
@@ -25,7 +26,6 @@ def fetch_final_score(matchup_date: str, team_name: str):
     res = requests.get(url).json()
     for game in res.get("dates", [])[0].get("games", []):
         if team_name in (game["teams"]["home"]["team"]["name"], game["teams"]["away"]["team"]["name"]):
-            # ✅ Only proceed if scores are available
             if "score" not in game["teams"]["home"] or "score" not in game["teams"]["away"]:
                 return None
             return {
@@ -87,8 +87,8 @@ def simulate_model_picks(game_date):
         matchup = f"{away} @ {home}"
 
         # Example placeholder model logic:
-        margin = round((hash(home) - hash(away)) % 5 - 2, 2)  # fake margin
-        total = round(8.0 + ((hash(home + away) % 300) / 100.0 - 1.5), 2)  # fake total
+        margin = round((hash(home) - hash(away)) % 5 - 2, 2)
+        total = round(8.0 + ((hash(home + away) % 300) / 100.0 - 1.5), 2)
 
         spread_pick = f"Home -1.5" if margin > 0 else "Away +1.5"
         total_pick = f"Over {total}" if total > 8 else f"Under {total}"
@@ -120,6 +120,15 @@ def update_picks_log(selected_date):
         st.info("No new picks to add for this date.")
         return log_df
 
+# --- Color formatting function ---
+def color_result(val):
+    color = {
+        "WIN": "lightgreen",
+        "LOSS": "#ffb3b3",
+        "PENDING": "#ffffcc"
+    }.get(val, "white")
+    return f"background-color: {color}"
+
 # --- Main Logic ---
 selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
 log_df = update_picks_log(selected_day)
@@ -133,7 +142,6 @@ if not log_df.empty:
 
     st.subheader(f"✅ Results for {selected_day.strftime('%B %d, %Y')}")
 
-    # --- Summary ---
     if "Spread Result" in evaluated.columns:
         spread_wins = (evaluated["Spread Result"] == "WIN").sum()
         spread_losses = (evaluated["Spread Result"] == "LOSS").sum()
@@ -148,10 +156,37 @@ if not log_df.empty:
     else:
         st.info("📋 No results yet — games likely haven't been played.")
 
-    st.dataframe(evaluated.reset_index(drop=True), use_container_width=True)
+    # --- Apply color formatting
+    styled_df = evaluated.style.applymap(color_result, subset=["Spread Result", "Total Result"])
+    st.dataframe(styled_df, use_container_width=True)
 
-    # --- Save to picks_log.csv ---
+    # --- Save Updated File
     final_log = pd.concat([log_df[log_df["Date"].dt.date != selected_day], evaluated])
     final_log.to_csv(PICKS_FILE, index=False)
+
+    # --- Rolling Performance Chart ---
+    st.subheader("📈 Rolling Win Rates (All Dates)")
+
+    full_df = pd.read_csv(PICKS_FILE, parse_dates=["Date"])
+    full_df = full_df.dropna(subset=["Spread Result", "Total Result"])
+    full_df["Date"] = full_df["Date"].dt.date
+
+    # Group win counts
+    grouped = full_df.groupby("Date").agg({
+        "Spread Result": lambda x: (x == "WIN").sum() / len(x) * 100,
+        "Total Result": lambda x: (x == "WIN").sum() / len(x) * 100
+    }).reset_index().rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
+
+    line = alt.Chart(grouped).transform_fold(
+        ["Spread Win %", "Total Win %"],
+        as_=["Metric", "Win %"]
+    ).mark_line(point=True).encode(
+        x="Date:T",
+        y="Win %:Q",
+        color="Metric:N"
+    ).properties(height=400)
+
+    st.altair_chart(line, use_container_width=True)
+
 else:
     st.warning("No games or picks found for this date.")
