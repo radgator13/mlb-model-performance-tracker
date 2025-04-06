@@ -140,24 +140,31 @@ col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
 # === PLOTLY CHART (Final Version) ===
-long_df = history.melt(id_vars=["Date"], value_vars=["Spread Win %", "Total Win %"],
-                       var_name="Metric", value_name="Win %")
+# === 📊 PLOTLY CHART (Final Enhancement) ===
+long_df = history.melt(
+    id_vars=["Date"],
+    value_vars=["Spread Win %", "Total Win %"],
+    var_name="Metric",
+    value_name="Win %"
+)
 
 fig = px.line(
     long_df,
     x="Date",
     y="Win %",
     color="Metric",
-    title="Daily Win % Over Time"
+    title="Daily Win % Over Time",
+    markers=True,
+    hover_data={"Win %": ".1f", "Date": True, "Metric": True}
 )
 
-# Add markers for all points and fix axis range
-fig.update_traces(mode="lines+markers")
+# Add horizontal reference line at 0%
+fig.add_hline(y=0, line_width=1, line_dash="dash", line_color="gray")
 
+# Improve layout
 fig.update_layout(
     xaxis=dict(
         title="Date",
-        range=[long_df["Date"].min(), long_df["Date"].max()],
         tickformat="%b %d",
         tickangle=-45,
         showgrid=True,
@@ -166,10 +173,12 @@ fig.update_layout(
     ),
     yaxis=dict(
         title="Win %",
-        range=[0, 100]
+        range=[-5, 105],  # pad for visibility of points at 0 and 100
+        showgrid=True
     ),
     legend=dict(orientation="h", yanchor="bottom", y=1.1, x=0),
     margin=dict(l=40, r=20, t=50, b=80)
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
