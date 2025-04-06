@@ -52,7 +52,7 @@ def confidence_score(pick, value):
 st.set_page_config(layout="wide")
 st.title("📊 MLB Model Performance Tracker")
 
-# Load picks
+# Load and clean picks
 try:
     df = pd.read_csv(PICKS_FILE)
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
@@ -61,11 +61,11 @@ except Exception as e:
     st.error(f"Failed to load picks: {e}")
     st.stop()
 
-# Sidebar date filter
+# Sidebar filter
 selected_date = st.date_input("Select date to evaluate:", value=datetime.today().date())
 filtered_df = df[df["Date"].dt.date == selected_date].copy()
 
-# Confidence columns
+# Add confidence columns
 if not filtered_df.empty:
     filtered_df["Confidence (Spread)"] = filtered_df.apply(
         lambda row: confidence_score(row["Model Pick (Spread)"], row["Actual Margin"]), axis=1
@@ -74,25 +74,24 @@ if not filtered_df.empty:
         lambda row: confidence_score(row["Model Pick (Total)"], row["Actual Total"]), axis=1
     )
 
-# Header
+# Daily summary
 st.success(f"✅ Results for {selected_date.strftime('%B %d, %Y')}")
 col1, col2 = st.columns(2)
 col1.metric("Spread Record", get_record(filtered_df["Spread Result"]))
 col2.metric("Total Record", get_record(filtered_df["Total Result"]))
 
-# Table
+# Picks table
 styled_df = filtered_df.style.map(color_result, subset=["Spread Result", "Total Result"])
 st.dataframe(styled_df, use_container_width=True)
 
-# Chart toggle
+# Win % chart range selector
 st.markdown("### 📊 Daily Win % (History)")
 range_option = st.radio("Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"], horizontal=True, index=2)
 
-# Filter scored data
+# Filter valid results
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Apply chart range
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= selected_date - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -100,7 +99,7 @@ elif range_option == "Last 14 Days":
 else:
     chart_df = valid_chart_df.copy()
 
-# Compute daily win %
+# Daily win rate computation
 def compute_win_rate(day_df):
     date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
@@ -113,59 +112,42 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else 0.0,
     }
 
-# Create win history
+# Build full history
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
 
-# Merge full date range
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
 history = pd.DataFrame({"Date": full_range})
-history = history.merge(actual_history, on="Date", how="left")
+history = pd.merge(history, actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Latest win % (non-zero)
+# Use most recent non-zero win % for metrics
 non_zero = history[(history["Spread Win %"] > 0) | (history["Total Win %"] > 0)]
 latest = non_zero.iloc[-1] if not non_zero.empty else {}
 
-# Show metrics
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# Melt for Plotly
+# Melt chart data
 long_df = history.melt(
     id_vars=["Date"],
     value_vars=["Spread Win %", "Total Win %"],
     var_name="Metric",
     value_name="Win %"
 )
-long_df["Zero"] = long_df["Win %"] == 0
 
-# === 🧪 DEBUG OUTPUT ===
-st.markdown("### 🧪 Debug: Daily Win % History")
-st.dataframe(history)
-
-st.markdown("### 🧪 Debug: Melted Chart Data")
-st.dataframe(long_df)
-
-st.markdown("### 🧪 Debug: Non-Zero Days")
-st.dataframe(non_zero)
-
-# === Final Plotly Scatter/Line Chart ===
-fig = px.scatter(
+# Plotly line chart with markers
+fig = px.line(
     long_df,
     x="Date",
     y="Win %",
     color="Metric",
-    symbol="Zero",
-    symbol_map={True: "x", False: "circle"},
-    title="Daily Win % Over Time",
-    hover_data={"Win %": ".1f", "Date": True, "Metric": True}
+    markers=True,
+    title="Daily Win % Over Time"
 )
-
-fig.update_traces(marker=dict(size=10, opacity=1.0))
 
 fig.update_layout(
     xaxis=dict(
