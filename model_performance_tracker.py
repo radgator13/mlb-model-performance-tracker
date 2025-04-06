@@ -89,6 +89,9 @@ range_option = st.radio(
     "Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"], horizontal=True
 )
 
+# Filter for valid result rows (WIN/LOSS only)
+valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
+
 # Win rate logic
 def compute_win_rate(day_df):
     date = day_df["Date"].iloc[0].date()
@@ -102,21 +105,29 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else None,
     }
 
+# Apply chart range filter
 if range_option == "Last 7 Days":
-    chart_df = df[df["Date"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
+    chart_df = valid_chart_df[valid_chart_df["Date"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
-    chart_df = df[df["Date"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=13)]
+    chart_df = valid_chart_df[valid_chart_df["Date"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=13)]
 else:
-    chart_df = df.copy()
+    chart_df = valid_chart_df.copy()
 
 grouped = chart_df.groupby(chart_df["Date"].dt.date)
 history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
+
+# Fill NaNs with 0.0% for flatline visualization
+history["Spread Win %"] = history["Spread Win %"].fillna(0)
+history["Total Win %"] = history["Total Win %"].fillna(0)
 
 # Show daily win % metrics
 latest = history.iloc[-1] if not history.empty else {}
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
+
+# Debug: Show raw history table if needed
+# st.dataframe(history)
 
 # Line chart
 if not history.empty:
