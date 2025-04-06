@@ -2,3 +2,8 @@
 *.vsidx
 *.sln
 *.pyproj
+
+*.csv  # <- optional, but may be blocking .csv files
+
+# 👇 this must be at the bottom
+!picks_log.csv
