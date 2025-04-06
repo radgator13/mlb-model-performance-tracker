@@ -90,14 +90,14 @@ st.markdown("### 📊 Daily Win % (History)")
 range_option = st.radio(
     "Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"],
     horizontal=True,
-    index=2
+    index=2  # Default to Full Season
 )
 
 # Filter valid results
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Filter by range
+# Filter by date range
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -105,7 +105,7 @@ elif range_option == "Last 14 Days":
 else:
     chart_df = valid_chart_df.copy()
 
-# Compute win %
+# Compute daily win %
 def compute_win_rate(day_df):
     date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
@@ -118,25 +118,25 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else 0.0,
     }
 
-# Generate full range history
+# Build full win rate history
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
 
-# Merge with full range
+# Build full date range
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
 history = pd.DataFrame({"Date": full_range})
-history = history.merge(actual_history, on="Date", how="left")
+history = pd.merge(history, actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Show latest stats
+# Show daily win % metrics
 latest = history.iloc[-1] if not history.empty else {}
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === 🔄 PLOTLY CHART ===
+# === 📊 PLOTLY CHART ===
 long_df = history.melt(id_vars=["Date"], value_vars=["Spread Win %", "Total Win %"],
                        var_name="Metric", value_name="Win %")
 
@@ -153,8 +153,16 @@ fig.update_layout(
     xaxis_title="Date",
     yaxis_title="Win %",
     yaxis=dict(range=[0, 100]),
+    xaxis=dict(
+        tickformat="%b %d",
+        tickmode="linear",
+        dtick="D1",  # Daily tick marks
+        tickangle=-45,
+        showgrid=True,
+        showline=True
+    ),
     legend=dict(orientation="h", y=1.1, x=0),
-    margin=dict(l=40, r=20, t=40, b=40)
+    margin=dict(l=40, r=20, t=40, b=80)
 )
 
 st.plotly_chart(fig, use_container_width=True)
