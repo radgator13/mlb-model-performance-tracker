@@ -95,7 +95,6 @@ def simulate_model_picks(game_date):
 def update_picks_log(selected_date):
     log_df = load_picks_log()
     existing_matchups = set(log_df[log_df["Date"] == pd.to_datetime(selected_date)]["Matchup"])
-
     new_picks = simulate_model_picks(selected_date)
     new_entries = [p for p in new_picks if p["Matchup"] not in existing_matchups]
 
@@ -116,7 +115,7 @@ def color_result(val):
     }.get(val, "white")
     return f"background-color: {color}"
 
-# --- Auto-populate last 7 days of picks ---
+# --- Auto-populate last 7 days ---
 log_df = load_picks_log()
 for i in range(7):
     check_day = date.today() - timedelta(days=i)
@@ -128,6 +127,7 @@ selected_day = st.date_input("Select date to evaluate:", date.today() - timedelt
 if not log_df.empty:
     log_df["Date"] = pd.to_datetime(log_df["Date"], errors="coerce")
     log_df = log_df.dropna(subset=["Date"])
+
     filtered_df = log_df[log_df["Date"].dt.date == selected_day]
     evaluated = filtered_df.apply(evaluate_row, axis=1)
 
@@ -147,8 +147,11 @@ if not log_df.empty:
     else:
         st.info("📋 No results yet — games likely haven't been played.")
 
-    styled_df = evaluated.style.applymap(color_result, subset=["Spread Result", "Total Result"])
-    st.dataframe(styled_df, use_container_width=True)
+    if "Spread Result" in evaluated.columns and "Total Result" in evaluated.columns:
+        styled_df = evaluated.style.applymap(color_result, subset=["Spread Result", "Total Result"])
+        st.dataframe(styled_df, use_container_width=True)
+    else:
+        st.dataframe(evaluated, use_container_width=True)
 
     final_log = pd.concat([log_df[log_df["Date"].dt.date != selected_day], evaluated])
     final_log.to_csv(PICKS_FILE, index=False)
