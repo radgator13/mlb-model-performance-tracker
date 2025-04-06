@@ -89,14 +89,16 @@ st.dataframe(styled_df, use_container_width=True)
 # Chart Toggle
 st.markdown("### 📊 Daily Win % (History)")
 range_option = st.radio(
-    "Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"], horizontal=True
+    "Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"],
+    horizontal=True,
+    index=2  # ✅ Default to "Full Season"
 )
 
-# Only use rows with WIN or LOSS results (exclude pending)
+# Only include scored results
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Apply chart range filter
+# Filter by range
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -104,7 +106,7 @@ elif range_option == "Last 14 Days":
 else:
     chart_df = valid_chart_df.copy()
 
-# Compute daily win rates
+# Compute win % for each day
 def compute_win_rate(day_df):
     date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
@@ -117,24 +119,26 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else None,
     }
 
-# Group by day and calculate actual win %
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 
-# Build full date range and merge with actuals
-full_range = pd.date_range(SEASON_START, datetime.today().date(), freq='D')
-history = pd.DataFrame({"Date": pd.to_datetime(full_range)})  # ✅ FIX: ensure datetime64[ns]
+# Ensure both merge keys are datetime64[ns]
+actual_history["Date"] = pd.to_datetime(actual_history["Date"])
+full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
+history = pd.DataFrame({"Date": pd.to_datetime(full_range)})
+
+# Merge and fill missing
 history = history.merge(actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Show daily win % metrics
+# Show metrics
 latest = history.iloc[-1] if not history.empty else {}
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# Altair chart for proper X-axis control
+# Chart via Altair
 chart_data = history.copy()
 chart_data["Date"] = pd.to_datetime(chart_data["Date"])
 
