@@ -94,11 +94,11 @@ range_option = st.radio(
     index=2  # Default to Full Season
 )
 
-# Only scored rows
+# Only use rows with scored results
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Date range filter
+# Filter by date range
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -127,37 +127,38 @@ actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
 history = pd.DataFrame({"Date": pd.to_datetime(full_range, errors="coerce")})
 
-# Merge and fill
+# Merge and fill missing
 history = pd.merge(history, actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Show latest metrics
+# Show daily win % metrics
 latest = history.iloc[-1] if not history.empty else {}
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# Prepare clean chart data
+# Chart preparation
 chart_data = history.copy()
 chart_data["Date"] = pd.to_datetime(chart_data["Date"], errors="coerce")
-chart_data = chart_data.drop_duplicates(subset=["Date"])
-chart_data = chart_data.sort_values("Date")
+chart_data = chart_data.drop_duplicates(subset=["Date"]).sort_values("Date")
 
-# Plot Altair chart
-chart = (
-    alt.Chart(chart_data)
-    .mark_line(point=True)
-    .encode(
-        x=alt.X("Date:T", title="Date", axis=alt.Axis(format="%b %d")),
-        y=alt.Y("value:Q", title="Win %", scale=alt.Scale(domain=[0, 100])),
-        color="metric:N"
-    )
-    .transform_fold(
-        ["Spread Win %", "Total Win %"],
-        as_=["metric", "value"]
-    )
-    .properties(width="container", height=300)
+# Build Altair chart with visible points for all days
+line = alt.Chart(chart_data).mark_line().encode(
+    x=alt.X("Date:T", title="Date", axis=alt.Axis(format="%b %d")),
+    y=alt.Y("value:Q", title="Win %", scale=alt.Scale(domain=[0, 100])),
+    color="metric:N"
 )
 
-st.altair_chart(chart, use_container_width=True)
+points = alt.Chart(chart_data).mark_point(size=40, filled=True, opacity=0.6).encode(
+    x="Date:T",
+    y="value:Q",
+    color="metric:N"
+)
+
+final_chart = (line + points).transform_fold(
+    ["Spread Win %", "Total Win %"],
+    as_=["metric", "value"]
+).properties(width="container", height=300)
+
+st.altair_chart(final_chart, use_container_width=True)
