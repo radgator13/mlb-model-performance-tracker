@@ -139,17 +139,6 @@ col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# === 🧪 DEBUG TOOL ===
-st.markdown("### 🧪 Debug: All rows with WIN or LOSS")
-debug_filtered = df[
-    df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])
-]
-st.dataframe(debug_filtered)
-
-st.markdown("### 🧪 Debug: All rows for April 6, 2025")
-april_6 = df[df["Date"].dt.date == datetime(2025, 4, 6).date()]
-st.dataframe(april_6)
-
 # Build long-form chart data
 long_df = history.melt(
     id_vars=["Date"],
