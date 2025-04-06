@@ -9,7 +9,6 @@ st.title("📊 MLB Model Performance Tracker with Auto Logging")
 
 PICKS_FILE = "picks_log.csv"
 
-# --- Load CSV ---
 @st.cache_data
 def load_picks_log():
     try:
@@ -20,7 +19,6 @@ def load_picks_log():
             "Actual Margin", "Spread Result", "Actual Total", "Total Result"
         ])
 
-# --- Fetch Game Scores ---
 def fetch_final_score(matchup_date: str, team_name: str):
     url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={matchup_date}"
     res = requests.get(url).json()
@@ -36,11 +34,9 @@ def fetch_final_score(matchup_date: str, team_name: str):
             }
     return None
 
-# --- Evaluate Row (add pending fallback) ---
 def evaluate_row(row):
     score = fetch_final_score(row["Date"].strftime("%Y-%m-%d"), row["Matchup"].split(" @ ")[1])
     
-    # Default pending values
     row["Actual Margin"] = "-"
     row["Spread Result"] = "PENDING"
     row["Actual Total"] = "-"
@@ -52,7 +48,6 @@ def evaluate_row(row):
     actual_margin = score["home"] - score["away"]
     actual_total = score["home"] + score["away"]
 
-    # Evaluate Spread
     if "Home" in row["Model Pick (Spread)"]:
         spread_line = float(row["Model Pick (Spread)"].split("-")[-1])
         row["Spread Result"] = "WIN" if actual_margin > spread_line else "LOSS"
@@ -60,7 +55,6 @@ def evaluate_row(row):
         spread_line = float(row["Model Pick (Spread)"].split("+")[-1])
         row["Spread Result"] = "WIN" if actual_margin < -spread_line else "LOSS"
 
-    # Evaluate Total
     if "Over" in row["Model Pick (Total)"]:
         line = float(row["Model Pick (Total)"].split()[1])
         row["Total Result"] = "WIN" if actual_total > line else "LOSS"
@@ -72,7 +66,6 @@ def evaluate_row(row):
     row["Actual Total"] = actual_total
     return row
 
-# --- Auto-generate Model Picks (placeholder logic) ---
 def simulate_model_picks(game_date):
     url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={game_date}"
     res = requests.get(url).json()
@@ -86,7 +79,6 @@ def simulate_model_picks(game_date):
         away = game["teams"]["away"]["team"]["name"]
         matchup = f"{away} @ {home}"
 
-        # Example placeholder model logic:
         margin = round((hash(home) - hash(away)) % 5 - 2, 2)
         total = round(8.0 + ((hash(home + away) % 300) / 100.0 - 1.5), 2)
 
@@ -102,7 +94,6 @@ def simulate_model_picks(game_date):
 
     return new_picks
 
-# --- Auto-log New Picks ---
 def update_picks_log(selected_date):
     log_df = load_picks_log()
     existing_matchups = set(log_df[log_df["Date"] == pd.to_datetime(selected_date)]["Matchup"])
@@ -120,7 +111,6 @@ def update_picks_log(selected_date):
         st.info("No new picks to add for this date.")
         return log_df
 
-# --- Color formatting function ---
 def color_result(val):
     color = {
         "WIN": "lightgreen",
@@ -129,7 +119,7 @@ def color_result(val):
     }.get(val, "white")
     return f"background-color: {color}"
 
-# --- Main Logic ---
+# --- Main App ---
 selected_day = st.date_input("Select date to evaluate:", date.today() - timedelta(days=1))
 log_df = update_picks_log(selected_day)
 
@@ -156,37 +146,46 @@ if not log_df.empty:
     else:
         st.info("📋 No results yet — games likely haven't been played.")
 
-    # --- Apply color formatting
     styled_df = evaluated.style.applymap(color_result, subset=["Spread Result", "Total Result"])
     st.dataframe(styled_df, use_container_width=True)
 
-    # --- Save Updated File
     final_log = pd.concat([log_df[log_df["Date"].dt.date != selected_day], evaluated])
     final_log.to_csv(PICKS_FILE, index=False)
 
-    # --- Rolling Performance Chart ---
-    st.subheader("📈 Rolling Win Rates (All Dates)")
+    # --- Rolling Performance Chart (Last 7 Days) ---
+    st.subheader("📈 7-Day Rolling Win %")
 
     full_df = pd.read_csv(PICKS_FILE, parse_dates=["Date"])
     full_df = full_df.dropna(subset=["Spread Result", "Total Result"])
     full_df["Date"] = full_df["Date"].dt.date
 
-    # Group win counts
-    grouped = full_df.groupby("Date").agg({
+    daily = full_df.groupby("Date").agg({
         "Spread Result": lambda x: (x == "WIN").sum() / len(x) * 100,
         "Total Result": lambda x: (x == "WIN").sum() / len(x) * 100
-    }).reset_index().rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
+    }).rename(columns={"Spread Result": "Spread Win %", "Total Result": "Total Win %"})
 
-    line = alt.Chart(grouped).transform_fold(
-        ["Spread Win %", "Total Win %"],
-        as_=["Metric", "Win %"]
-    ).mark_line(point=True).encode(
-        x="Date:T",
-        y="Win %:Q",
-        color="Metric:N"
-    ).properties(height=400)
+    daily = daily.rolling(window=7).mean().dropna().reset_index()
 
-    st.altair_chart(line, use_container_width=True)
+    if not daily.empty:
+        latest = daily.iloc[-1]
+        col3, col4 = st.columns(2)
+        with col3:
+            st.metric("Spread Win % (7d)", f"{latest['Spread Win %']:.1f}%")
+        with col4:
+            st.metric("Total Win % (7d)", f"{latest['Total Win %']:.1f}%")
+
+        chart = alt.Chart(daily).transform_fold(
+            ["Spread Win %", "Total Win %"],
+            as_=["Type", "Win %"]
+        ).mark_line(point=True).encode(
+            x="Date:T",
+            y="Win %:Q",
+            color="Type:N"
+        ).properties(height=400)
+
+        st.altair_chart(chart, use_container_width=True)
+    else:
+        st.info("Not enough data for a 7-day trend yet.")
 
 else:
     st.warning("No games or picks found for this date.")
