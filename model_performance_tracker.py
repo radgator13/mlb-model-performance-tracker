@@ -1,6 +1,7 @@
 ﻿import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import altair as alt
 from datetime import datetime
 
 # === CONFIG ===
@@ -28,6 +29,8 @@ def format_percent(p):
 
 def confidence_score(pick, value):
     try:
+        if pd.isnull(value):
+            return "—"
         if "Over" in pick or "Under" in pick:
             diff = abs(float(pick.split()[1]) - float(value))
         else:
@@ -89,10 +92,19 @@ range_option = st.radio(
     "Win % Chart Range", ["Last 7 Days", "Last 14 Days", "Full Season"], horizontal=True
 )
 
-# Filter for valid result rows (WIN/LOSS only)
+# Only use rows with WIN or LOSS results (exclude pending)
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
+valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Win rate logic
+# Apply chart range filter
+if range_option == "Last 7 Days":
+    chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
+elif range_option == "Last 14 Days":
+    chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=13)]
+else:
+    chart_df = valid_chart_df.copy()
+
+# Compute daily win rates
 def compute_win_rate(day_df):
     date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
@@ -105,22 +117,14 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else None,
     }
 
-# Floor to date (strip time) for clean daily grouping
-valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
-
-# Apply chart range filter
-if range_option == "Last 7 Days":
-    chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
-elif range_option == "Last 14 Days":
-    chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=13)]
-else:
-    chart_df = valid_chart_df.copy()
-
-# Group by day and compute win %
+# Group by day and calculate actual history
 grouped = chart_df.groupby("Day")
-history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
+actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 
-# Fill NaNs with 0.0% for flatline visualization
+# Build full date range and merge with actuals
+full_range = pd.date_range(SEASON_START, datetime.today().date(), freq='D')
+history = pd.DataFrame({"Date": full_range.date})
+history = history.merge(actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
@@ -130,23 +134,23 @@ col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# Line chart (fix time-based axis labels!)
-if not history.empty:
-    chart_data = history.set_index("Date")[["Spread Win %", "Total Win %"]]
-    chart_data.index = pd.to_datetime(chart_data.index).date  # <-- Key Fix!
-    chart_data.index.name = "Date"
-    import altair as alt
-
+# Altair chart for proper X-axis
 chart_data = history.copy()
 chart_data["Date"] = pd.to_datetime(chart_data["Date"])
-base = alt.Chart(chart_data).mark_line(point=True).encode(
-    x=alt.X("Date:T", title="Date", axis=alt.Axis(format="%b %d")),
-    y=alt.Y("value:Q", title="Win %"),
-    color="metric:N"
-).transform_fold(
-    ["Spread Win %", "Total Win %"],
-    as_=["metric", "value"]
-).properties(width="container", height=300)
 
-st.altair_chart(base, use_container_width=True)
+chart = (
+    alt.Chart(chart_data)
+    .mark_line(point=True)
+    .encode(
+        x=alt.X("Date:T", title="Date", axis=alt.Axis(format="%b %d")),
+        y=alt.Y("value:Q", title="Win %", scale=alt.Scale(domain=[0, 100])),
+        color="metric:N"
+    )
+    .transform_fold(
+        ["Spread Win %", "Total Win %"],
+        as_=["metric", "value"]
+    )
+    .properties(width="container", height=300)
+)
 
+st.altair_chart(chart, use_container_width=True)
