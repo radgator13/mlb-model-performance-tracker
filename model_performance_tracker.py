@@ -94,11 +94,11 @@ range_option = st.radio(
     index=2  # Default to Full Season
 )
 
-# Only use rows with WIN/LOSS (exclude PENDING)
+# Only scored rows
 valid_chart_df = df[df["Spread Result"].isin(["WIN", "LOSS"]) | df["Total Result"].isin(["WIN", "LOSS"])].copy()
 valid_chart_df["Day"] = valid_chart_df["Date"].dt.floor("D")
 
-# Filter by date range
+# Date range filter
 if range_option == "Last 7 Days":
     chart_df = valid_chart_df[valid_chart_df["Day"] >= pd.to_datetime(selected_date) - pd.Timedelta(days=6)]
 elif range_option == "Last 14 Days":
@@ -106,7 +106,7 @@ elif range_option == "Last 14 Days":
 else:
     chart_df = valid_chart_df.copy()
 
-# Compute win rate per day
+# Compute daily win %
 def compute_win_rate(day_df):
     date = day_df["Day"].iloc[0]
     s_wins = (day_df["Spread Result"] == "WIN").sum()
@@ -119,30 +119,32 @@ def compute_win_rate(day_df):
         "Total Win %": t_wins / t_total * 100 if t_total else None,
     }
 
-# Group and calculate actual win data
 grouped = chart_df.groupby("Day")
 actual_history = pd.DataFrame([compute_win_rate(day) for _, day in grouped])
 
-# Force both Date columns to datetime64[ns]
+# Ensure datetime64[ns] on both sides
 actual_history["Date"] = pd.to_datetime(actual_history["Date"], errors="coerce")
 full_range = pd.date_range(SEASON_START, datetime.today().date(), freq="D")
 history = pd.DataFrame({"Date": pd.to_datetime(full_range, errors="coerce")})
 
-# Safe merge
+# Merge and fill
 history = pd.merge(history, actual_history, on="Date", how="left")
 history["Spread Win %"] = history["Spread Win %"].fillna(0)
 history["Total Win %"] = history["Total Win %"].fillna(0)
 
-# Show metrics
+# Show latest metrics
 latest = history.iloc[-1] if not history.empty else {}
 col1, col2 = st.columns(2)
 col1.metric("Spread Win % (Latest)", format_percent(latest.get("Spread Win %")))
 col2.metric("Total Win % (Latest)", format_percent(latest.get("Total Win %")))
 
-# Altair line chart
+# Prepare clean chart data
 chart_data = history.copy()
 chart_data["Date"] = pd.to_datetime(chart_data["Date"], errors="coerce")
+chart_data = chart_data.drop_duplicates(subset=["Date"])
+chart_data = chart_data.sort_values("Date")
 
+# Plot Altair chart
 chart = (
     alt.Chart(chart_data)
     .mark_line(point=True)
